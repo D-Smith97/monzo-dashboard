@@ -42,9 +42,15 @@
 
       <div class="space-y-4">
         <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Statement Data</h2>
+        
+        <!-- Bulletproof Label Wrapper with Broad Acceptance Filter -->
         <label class="block bg-slate-950 border-2 border-dashed border-slate-800 hover:border-emerald-500/60 rounded-2xl p-6 text-center cursor-pointer transition-all">
-          <input type="file" id="csvFileInput" accept=".csv" class="hidden">
-          <span id="fileNameLabel" class="text-xs font-medium text-slate-300 block">Select Monzo CSV Statement</span>
+          <input type="file" id="csvFileInput" accept=".csv, .txt, text/*, application/vnd.ms-excel, application/csv, */*" class="hidden">
+          
+          <div class="w-10 h-10 bg-slate-900 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+          </div>
+          <span id="fileNameLabel" class="text-xs font-medium text-slate-300 block">Select CSV Statement (Downloads / Google Drive)</span>
         </label>
       </div>
 
@@ -184,10 +190,8 @@
       process(rows, userInputs) {
         if (!rows || rows.length === 0) throw new Error("No statement rows provided.");
 
-        // Normalize keys to safely handle BOM marks, spaces, and lowercase variations in Monzo CSVs
         const sample = rows[0];
         const keys = Object.keys(sample);
-        
         const cleanKey = (keyword) => keys.find(k => k.replace(/^\uFEFF/, '').trim().toLowerCase().includes(keyword));
         
         const dateKey = cleanKey('date') || cleanKey('created');
@@ -405,4 +409,40 @@
       document.getElementById('totalOutflow').innerText = `£${data.metrics.grossOutflow.toFixed(2)}`;
       document.getElementById('totalInflow').innerText = `£${data.metrics.totalInflow.toFixed(2)}`;
       document.getElementById('dailyRate').innerText = `£${data.metrics.dailyRate.toFixed(2)}`;
-      document.getElementById('fastFoodTotal'
+      document.getElementById('fastFoodTotal').innerText = `£${data.metrics.fastFoodTotal.toFixed(2)}`;
+
+      document.getElementById('merchantList').innerHTML = Object.entries(data.charts.merchantTotals)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, val]) => `
+          <div class="flex justify-between items-center border-b border-slate-800 pb-2 last:border-0">
+            <span class="text-slate-300 capitalize">${name}</span>
+            <span class="text-slate-100 font-semibold">£${val.toFixed(2)}</span>
+          </div>`).join('') || '<p class="text-xs text-slate-500">No variable data found.</p>';
+
+      const canvas = document.getElementById('categoryChart');
+      if (appState.chartInstance) appState.chartInstance.destroy();
+      appState.chartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(data.charts.categoryTotals),
+          datasets: [{
+            data: Object.values(data.charts.categoryTotals),
+            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#0ea5e9', '#f43f5e', '#64748b'],
+            borderWidth: 2,
+            borderColor: '#0f172a'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '75%',
+          plugins: { legend: { position: 'right', labels: { color: '#94a3b8', boxWidth: 10 } } }
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

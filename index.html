@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monzo Command Center</title>
+  <title>Monzo Command Centre</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/Chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     /* View Transitions */
     .view-transition { transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -58,8 +58,8 @@
         <input type="file" id="csvFileInput" accept=".csv, text/csv, text/plain, application/csv, */*" class="hidden">
       </div>
 
-      <button id="analyzeBtn" disabled class="w-full py-4 px-4 bg-slate-800 text-slate-500 font-semibold rounded-xl transition-all duration-300 ease-out flex justify-center items-center gap-2 cursor-not-allowed">
-        <span>Initialize Dashboard</span>
+      <button id="analyseBtn" disabled class="w-full py-4 px-4 bg-slate-800 text-slate-500 font-semibold rounded-xl transition-all duration-300 ease-out flex justify-center items-center gap-2 cursor-not-allowed">
+        <span>Initialise Dashboard</span>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
       </button>
     </div>
@@ -246,7 +246,7 @@
       viewSetup: document.getElementById('view-setup'),
       viewDashboard: document.getElementById('view-dashboard'),
       fileInput: document.getElementById('csvFileInput'),
-      analyzeBtn: document.getElementById('analyzeBtn'),
+      analyseBtn: document.getElementById('analyseBtn'),
       backBtn: document.getElementById('backBtn'),
       mainBalInput: document.getElementById('mainBalInput'),
       flexBalInput: document.getElementById('flexBalInput'),
@@ -257,20 +257,20 @@
      * APPLICATION INIT & PERSISTENCE ENGINE
      */
     function init() {
-      // 1. Restore input values from localStorage
+      // Restore input values from localStorage
       const savedMain = localStorage.getItem('monzo_mainBal');
       const savedFlex = localStorage.getItem('monzo_flexBal');
 
       if (savedMain !== null) DOM.mainBalInput.value = savedMain;
       if (savedFlex !== null) DOM.flexBalInput.value = savedFlex;
 
-      // 2. Real-time state persistence event listeners
+      // Real-time state persistence event listeners
       DOM.mainBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_mainBal', e.target.value));
       DOM.flexBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_flexBal', e.target.value));
 
-      // 3. UI Control Binding
+      // UI Control Binding
       DOM.fileInput.addEventListener('change', handleFileSelect);
-      DOM.analyzeBtn.addEventListener('click', executeAnalysis);
+      DOM.analyseBtn.addEventListener('click', executeAnalysis);
       DOM.backBtn.addEventListener('click', showSetupView);
     }
 
@@ -283,9 +283,9 @@
       DOM.fileNameLabel.classList.add('text-emerald-400');
       
       // Enable Submit Button
-      DOM.analyzeBtn.disabled = false;
-      DOM.analyzeBtn.classList.remove('bg-slate-800', 'text-slate-500', 'cursor-not-allowed');
-      DOM.analyzeBtn.classList.add('bg-emerald-600', 'text-white', 'hover:bg-emerald-500', 'shadow-[0_0_20px_rgba(16,185,129,0.3)]', 'cursor-pointer');
+      DOM.analyseBtn.disabled = false;
+      DOM.analyseBtn.classList.remove('bg-slate-800', 'text-slate-500', 'cursor-not-allowed');
+      DOM.analyseBtn.classList.add('bg-emerald-600', 'text-white', 'hover:bg-emerald-500', 'shadow-[0_0_20px_rgba(16,185,129,0.3)]', 'cursor-pointer');
     }
 
     /**
@@ -326,24 +326,59 @@
      * CORE ANALYSIS & DATA PARSING ENGINE
      */
     function executeAnalysis() {
-      if (!appState.selectedFile) return;
+      if (!appState.selectedFile) {
+        alert("Please select a valid Monzo CSV statement file first.");
+        return;
+      }
+
+      if (typeof Papa === 'undefined') {
+        alert("CSV Parser library failed to load. Please check your network connection.");
+        return;
+      }
 
       Papa.parse(appState.selectedFile, {
         header: true,
         dynamicTyping: true,
         skipEmptyLines: true,
-        complete: (results) => processData(results.data)
+        complete: (results) => {
+          try {
+            processData(results.data);
+          } catch (err) {
+            console.error("Analysis Error:", err);
+            alert("An error occurred while processing the statement data: " + err.message);
+          }
+        },
+        error: (err) => {
+          alert("Failed to parse CSV file: " + err.message);
+        }
       });
     }
 
     function processData(rows) {
-      const validRows = rows.filter(r => r.created && typeof r.amount === 'number');
+      if (!rows || rows.length === 0) {
+        alert("The selected CSV file appears to be empty.");
+        return;
+      }
+
+      // Flexibly find date and amount fields regardless of exact header casing
+      const sample = rows[0];
+      const dateKey = Object.keys(sample).find(k => k.toLowerCase().includes('created') || k.toLowerCase().includes('date'));
+      const amountKey = Object.keys(sample).find(k => k.toLowerCase() === 'amount');
+      const titleKey = Object.keys(sample).find(k => k.toLowerCase() === 'name' || k.toLowerCase() === 'description' || k.toLowerCase() === 'title');
+      const categoryKey = Object.keys(sample).find(k => k.toLowerCase().includes('category') || k.toLowerCase().includes('categories'));
+
+      if (!dateKey || !amountKey) {
+        alert("Could not identify standard Monzo date or amount columns in this CSV statement.");
+        return;
+      }
+
+      const validRows = rows.filter(r => r[dateKey] && typeof r[amountKey] === 'number');
       if (validRows.length === 0) {
         alert("No valid transaction records were found in the statement.");
         return;
       }
 
-      validRows.forEach(r => r.parsedDate = new Date(r.created));
+      validRows.forEach(r => r.parsedDate = new Date(r[dateKey]));
       validRows.sort((a, b) => b.parsedDate - a.parsedDate);
 
       // Current anchor date determined by latest row entry
@@ -369,169 +404,4 @@
         const exactBillDay = bill.day === -1 ? lastDayOfMonth : bill.day;
         if (exactBillDay > currentDay) {
           pendingBills.push({ ...bill, exactDay: exactBillDay });
-          pendingBillsTotal += bill.amount;
-        }
-      });
-
-      // Calculate Metrics
-      let grossOutflow = 0;
-      let totalInflow = 0;
-      let fastFoodTotal = 0;
-      let variableOutflow = 0;
-      const categoryTotals = {};
-      const merchantTotals = {};
-
-      monthRows.forEach(r => {
-        const amt = r.amount;
-        const title = (r.title || 'Unknown').trim().toLowerCase();
-        const category = (r.categories || 'Uncategorized').trim();
-
-        if (amt > 0) {
-          totalInflow += amt;
-        } else if (amt < 0) {
-          const absAmt = Math.abs(amt);
-          grossOutflow += absAmt;
-
-          // Fast Food Tracking
-          if (title.includes("mcdonald") || title.includes("kfc") || title.includes("uber eats") || title.includes("deliveroo")) {
-            fastFoodTotal += absAmt;
-          }
-
-          // Evaluate Variable Outgoings
-          const isExcluded = CONFIG.excludeFromVariable.some(kw => title.includes(kw));
-          if (!isExcluded) {
-            variableOutflow += absAmt;
-            categoryTotals[category] = (categoryTotals[category] || 0) + absAmt;
-            merchantTotals[title] = (merchantTotals[title] || 0) + absAmt;
-          }
-        }
-      });
-
-      const dailyRate = currentDay > 0 ? (variableOutflow / currentDay) : 0;
-      
-      // Balances & Headroom
-      const mainBal = parseFloat(DOM.mainBalInput.value) || 0;
-      const flexBal = parseFloat(DOM.flexBalInput.value) || 0;
-
-      const odUsed = mainBal < 0 ? Math.min(CONFIG.limits.overdraft, Math.abs(mainBal)) : 0;
-      const odHeadroom = CONFIG.limits.overdraft - odUsed;
-      const flexHeadroom = CONFIG.limits.flex - flexBal;
-
-      // Forecast Scenarios
-      const scenA_totalOutflow = pendingBillsTotal + (dailyRate * daysRemaining);
-      const scenB_totalOutflow = pendingBillsTotal + (20.0 * daysRemaining);
-
-      const scenA_prePaydayBal = mainBal - scenA_totalOutflow;
-      const scenB_prePaydayBal = mainBal - scenB_totalOutflow;
-
-      // Send to Renderer
-      renderDashboard({
-        dateString: latestDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
-        daysRemaining,
-        metrics: { grossOutflow, totalInflow, dailyRate, fastFoodTotal },
-        limits: {
-          odUsed, odHeadroom, odPct: (odUsed / CONFIG.limits.overdraft) * 100,
-          flexBal, flexHeadroom, flexPct: (flexBal / CONFIG.limits.flex) * 100
-        },
-        forecast: {
-          pendingBills, pendingBillsTotal,
-          scenA_bal: scenA_prePaydayBal, scenA_odRemaining: CONFIG.limits.overdraft + scenA_prePaydayBal,
-          scenB_bal: scenB_prePaydayBal, scenB_odRemaining: CONFIG.limits.overdraft + scenB_prePaydayBal
-        },
-        charts: { categoryTotals, merchantTotals }
-      });
-
-      showDashboardView();
-    }
-
-    /**
-     * RENDERER ENGINE
-     */
-    function renderDashboard(data) {
-      // Header & Balances
-      document.getElementById('dashboardDateText').innerText = `Data current as of ${data.dateString}`;
-      document.getElementById('daysRemainingBadge').innerText = data.daysRemaining;
-      
-      document.getElementById('odUsageText').innerText = `£${data.limits.odUsed.toFixed(2)} / £${CONFIG.limits.overdraft.toLocaleString()}`;
-      document.getElementById('odProgressBar').style.width = `${Math.min(100, data.limits.odPct)}%`;
-      document.getElementById('odHeadroomText').innerText = `Buffer: £${Math.max(0, data.limits.odHeadroom).toFixed(2)}`;
-
-      document.getElementById('flexUsageText').innerText = `£${data.limits.flexBal.toFixed(2)} / £${CONFIG.limits.flex.toLocaleString()}`;
-      document.getElementById('flexProgressBar').style.width = `${Math.min(100, data.limits.flexPct)}%`;
-      document.getElementById('flexHeadroomText').innerText = `Available: £${Math.max(0, data.limits.flexHeadroom).toFixed(2)}`;
-
-      // Pending Bills List
-      document.getElementById('pendingBillsTotal').innerText = `£${data.forecast.pendingBillsTotal.toFixed(2)}`;
-      const billsHtml = data.forecast.pendingBills.length > 0 
-        ? data.forecast.pendingBills.map(b => `
-            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-              <span class="text-sm text-slate-300 font-medium">${b.name} <span class="text-[10px] text-slate-500 ml-1">(Due ${b.exactDay}th)</span></span>
-              <span class="text-sm font-bold text-slate-200">£${b.amount.toFixed(2)}</span>
-            </div>`).join('')
-        : `<p class="text-sm text-emerald-500 italic p-2 bg-emerald-500/10 rounded-lg text-center">All fixed outgoings cleared for this month!</p>`;
-      document.getElementById('pendingBillsList').innerHTML = billsHtml;
-
-      // Scenarios
-      document.getElementById('scenA_prePayday').innerText = `${data.forecast.scenA_bal < 0 ? '-' : ''}£${Math.abs(data.forecast.scenA_bal).toFixed(2)}`;
-      document.getElementById('scenA_odHeadroom').innerHTML = `Remaining Overdraft: <span class="${data.forecast.scenA_odRemaining < 0 ? 'text-rose-500 font-bold' : 'text-slate-300'}">£${data.forecast.scenA_odRemaining.toFixed(2)}</span>`;
-
-      document.getElementById('scenB_prePayday').innerText = `${data.forecast.scenB_bal < 0 ? '-' : ''}£${Math.abs(data.forecast.scenB_bal).toFixed(2)}`;
-      document.getElementById('scenB_odHeadroom').innerHTML = `Remaining Overdraft: <span class="${data.forecast.scenB_odRemaining < 0 ? 'text-rose-500 font-bold' : 'text-emerald-400 font-bold'}">£${data.forecast.scenB_odRemaining.toFixed(2)}</span>`;
-
-      // Metrics
-      document.getElementById('totalOutflow').innerText = `£${data.metrics.grossOutflow.toFixed(2)}`;
-      document.getElementById('totalInflow').innerText = `£${data.metrics.totalInflow.toFixed(2)}`;
-      document.getElementById('dailyRate').innerText = `£${data.metrics.dailyRate.toFixed(2)}`;
-      document.getElementById('fastFoodTotal').innerText = `£${data.metrics.fastFoodTotal.toFixed(2)}`;
-
-      // Top Merchants
-      const topMerchants = Object.entries(data.charts.merchantTotals)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, val]) => `
-          <div class="flex justify-between items-center border-b border-slate-800 pb-2 last:border-0 last:pb-0">
-            <span class="text-slate-300 capitalize">${name}</span>
-            <span class="text-slate-100 font-semibold">£${val.toFixed(2)}</span>
-          </div>
-        `).join('');
-      document.getElementById('merchantList').innerHTML = topMerchants || '<p class="text-xs text-slate-500">No variable data found.</p>';
-
-      // Chart
-      drawChart(data.charts.categoryTotals);
-    }
-
-    function drawChart(categoryTotals) {
-      const ctx = document.getElementById('categoryChart').getContext('2d');
-      if (appState.chartInstance) appState.chartInstance.destroy();
-
-      appState.chartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(categoryTotals),
-          datasets: [{
-            data: Object.values(categoryTotals),
-            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#0ea5e9', '#f43f5e', '#64748b'],
-            borderWidth: 2,
-            borderColor: '#0f172a',
-            hoverOffset: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '75%',
-          plugins: { 
-            legend: { 
-              position: 'right', 
-              labels: { color: '#94a3b8', boxWidth: 10, padding: 12, font: { size: 11 } } 
-            } 
-          }
-        }
-      });
-    }
-
-    // Initialize App Context
-    init();
-  </script>
-</body>
-</html>
+          pendingBillsTotal +

@@ -20,9 +20,9 @@
   <!-- ==========================================
        VIEW 1: SETUP & INPUT SCREEN
        ========================================== -->
-  <div id="view-setup" class="max-w-md mx-auto mt-16 p-4 view-transition fade-in">
+  <div id="view-setup" class="max-w-md mx-auto mt-12 p-4 view-transition fade-in">
     <header class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-emerald-400 tracking-tight">Monzo Command</h1>
+      <h1 class="text-3xl font-bold text-emerald-400 tracking-tight">Monzo Command Centre</h1>
       <p class="text-sm text-slate-400 mt-2">Local Financial Forecasting Engine</p>
     </header>
 
@@ -46,16 +46,19 @@
 
       <hr class="border-slate-800">
 
-      <!-- Statement File Upload -->
+      <!-- Statement File Upload (Mobile & Google Drive Optimised) -->
       <div class="space-y-4">
         <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Statement Data</h2>
-        <label for="csvFileInput" class="cursor-pointer group block bg-slate-950 border-2 border-dashed border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/5 rounded-2xl p-8 text-center transition-all">
-          <div class="w-12 h-12 bg-slate-800 group-hover:bg-emerald-500/20 text-slate-400 group-hover:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3 transition-colors">
+        
+        <div class="relative bg-slate-950 border-2 border-dashed border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/5 rounded-2xl p-8 text-center transition-all cursor-pointer">
+          <!-- Direct overlay input to ensure mobile touch compatibility -->
+          <input type="file" id="csvFileInput" accept=".csv, .txt, text/*, application/vnd.ms-excel, application/csv, */*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+          
+          <div class="w-12 h-12 bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 pointer-events-none">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           </div>
-          <span id="fileNameLabel" class="text-sm font-medium text-slate-300 group-hover:text-emerald-400 transition-colors">Select CSV Statement</span>
-        </label>
-        <input type="file" id="csvFileInput" accept=".csv, text/csv, text/plain, application/csv, */*" class="hidden">
+          <span id="fileNameLabel" class="text-sm font-medium text-slate-300 pointer-events-none block">Select CSV Statement (Downloads / Google Drive)</span>
+        </div>
       </div>
 
       <button id="analyseBtn" disabled class="w-full py-4 px-4 bg-slate-800 text-slate-500 font-semibold rounded-xl transition-all duration-300 ease-out flex justify-center items-center gap-2 cursor-not-allowed">
@@ -85,7 +88,7 @@
     <!-- Main Layout Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      <!-- LEFT COLUMN: Limits & Fixed Bills -->
+      <!-- LEFT COLUMN: Limits & Fixed Outgoings -->
       <div class="space-y-6 lg:col-span-1">
         
         <!-- Credit Limits & Headroom -->
@@ -115,13 +118,13 @@
           </div>
         </div>
 
-        <!-- Pending Hardcoded Bills List -->
+        <!-- Pending Hardcoded Outgoings List -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col h-auto">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-sm font-bold uppercase tracking-widest text-slate-500">Pending Outgoings</h2>
             <span id="pendingBillsTotal" class="text-sm font-bold text-amber-400 bg-amber-400/10 px-3 py-1 rounded-lg">£0.00</span>
           </div>
-          <p class="text-xs text-slate-400 mb-4 pb-4 border-b border-slate-800">Fixed bills remaining before next payday.</p>
+          <p class="text-xs text-slate-400 mb-4 pb-4 border-b border-slate-800">Fixed outgoings remaining before next payday.</p>
           <div id="pendingBillsList" class="space-y-3 flex-grow">
             <!-- Populated dynamically -->
           </div>
@@ -217,9 +220,7 @@
        ========================================== -->
   <script>
     /**
-     * HARDCODED CONFIGURATION
-     * Fixed limits, pay schedules, and recurring outgoings.
-     * Note: 'day: -1' specifies the last day of the active month dynamically.
+     * CONFIGURATION
      */
     const CONFIG = {
       limits: { overdraft: 2000, flex: 3000 },
@@ -231,7 +232,6 @@
         { id: 'phone', name: 'O2 (Phone)', amount: 15.16, day: 24 },
         { id: 'perks', name: 'Monzo Perks', amount: 7.00, day: -1 }
       ],
-      // Keywords ignored during variable daily spend rate calculation
       excludeFromVariable: ['goodlord', 'amazon', 'spotify', 'o2', 'monzo perks', 'flex', 'apple', 'puregym', 'dominic smith']
     };
 
@@ -241,7 +241,7 @@
       chartInstance: null
     };
 
-    // DOM Element Reference Map
+    // DOM References
     const DOM = {
       viewSetup: document.getElementById('view-setup'),
       viewDashboard: document.getElementById('view-dashboard'),
@@ -254,21 +254,18 @@
     };
 
     /**
-     * APPLICATION INIT & PERSISTENCE ENGINE
+     * INIT & STATE PERSISTENCE
      */
     function init() {
-      // Restore input values from localStorage
       const savedMain = localStorage.getItem('monzo_mainBal');
       const savedFlex = localStorage.getItem('monzo_flexBal');
 
       if (savedMain !== null) DOM.mainBalInput.value = savedMain;
       if (savedFlex !== null) DOM.flexBalInput.value = savedFlex;
 
-      // Real-time state persistence event listeners
       DOM.mainBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_mainBal', e.target.value));
       DOM.flexBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_flexBal', e.target.value));
 
-      // UI Control Binding
       DOM.fileInput.addEventListener('change', handleFileSelect);
       DOM.analyseBtn.addEventListener('click', executeAnalysis);
       DOM.backBtn.addEventListener('click', showSetupView);
@@ -282,14 +279,13 @@
       DOM.fileNameLabel.innerText = file.name;
       DOM.fileNameLabel.classList.add('text-emerald-400');
       
-      // Enable Submit Button
       DOM.analyseBtn.disabled = false;
       DOM.analyseBtn.classList.remove('bg-slate-800', 'text-slate-500', 'cursor-not-allowed');
       DOM.analyseBtn.classList.add('bg-emerald-600', 'text-white', 'hover:bg-emerald-500', 'shadow-[0_0_20px_rgba(16,185,129,0.3)]', 'cursor-pointer');
     }
 
     /**
-     * SPA VIEW ROUTER
+     * SPA ROUTER
      */
     function showDashboardView() {
       DOM.viewSetup.classList.remove('fade-in');
@@ -298,9 +294,7 @@
       setTimeout(() => {
         DOM.viewSetup.classList.add('hidden-view');
         DOM.viewDashboard.classList.remove('hidden-view');
-        
-        void DOM.viewDashboard.offsetWidth; // Force layout recalculation
-        
+        void DOM.viewDashboard.offsetWidth;
         DOM.viewDashboard.classList.remove('opacity-0');
         DOM.viewDashboard.classList.add('fade-in');
       }, 350);
@@ -314,16 +308,14 @@
         DOM.viewDashboard.classList.add('hidden-view');
         DOM.viewDashboard.classList.remove('fade-out');
         DOM.viewSetup.classList.remove('hidden-view');
-        
         void DOM.viewSetup.offsetWidth;
-        
         DOM.viewSetup.classList.remove('fade-out');
         DOM.viewSetup.classList.add('fade-in');
       }, 350);
     }
 
     /**
-     * CORE ANALYSIS & DATA PARSING ENGINE
+     * MOBILE-OPTIMISED PARSER ENGINE
      */
     function executeAnalysis() {
       if (!appState.selectedFile) {
@@ -331,36 +323,52 @@
         return;
       }
 
-      if (typeof Papa === 'undefined') {
-        alert("CSV Parser library failed to load. Please check your network connection.");
-        return;
-      }
-
-      Papa.parse(appState.selectedFile, {
-        header: true,
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          try {
-            processData(results.data);
-          } catch (err) {
-            console.error("Analysis Error:", err);
-            alert("An error occurred while processing the statement data: " + err.message);
-          }
-        },
-        error: (err) => {
-          alert("Failed to parse CSV file: " + err.message);
+      // Read file text via native FileReader to avoid mobile stream issues with Drive files
+      const reader = new FileReader();
+      
+      reader.onload = function(evt) {
+        const csvContent = evt.target.result;
+        if (!csvContent || csvContent.trim().length === 0) {
+          alert("The selected file appears to be empty.");
+          return;
         }
-      });
+
+        if (typeof Papa === 'undefined') {
+          alert("CSV Parser library failed to load. Please check your network connection.");
+          return;
+        }
+
+        Papa.parse(csvContent, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            try {
+              processData(results.data);
+            } catch (err) {
+              console.error("Analysis Error:", err);
+              alert("An error occurred while processing the statement data: " + err.message);
+            }
+          },
+          error: (err) => {
+            alert("Failed to parse CSV content: " + err.message);
+          }
+        });
+      };
+
+      reader.onerror = function() {
+        alert("Unable to read the file from device storage. Please try re-selecting the file.");
+      };
+
+      reader.readAsText(appState.selectedFile);
     }
 
     function processData(rows) {
       if (!rows || rows.length === 0) {
-        alert("The selected CSV file appears to be empty.");
+        alert("The selected CSV statement contains no valid data rows.");
         return;
       }
 
-      // Flexibly find date and amount fields regardless of exact header casing
       const sample = rows[0];
       const dateKey = Object.keys(sample).find(k => k.toLowerCase().includes('created') || k.toLowerCase().includes('date'));
       const amountKey = Object.keys(sample).find(k => k.toLowerCase() === 'amount');
@@ -368,7 +376,7 @@
       const categoryKey = Object.keys(sample).find(k => k.toLowerCase().includes('category') || k.toLowerCase().includes('categories'));
 
       if (!dateKey || !amountKey) {
-        alert("Could not identify standard Monzo date or amount columns in this CSV statement.");
+        alert("Could not identify standard Monzo date or amount columns in this CSV file.");
         return;
       }
 
@@ -381,22 +389,18 @@
       validRows.forEach(r => r.parsedDate = new Date(r[dateKey]));
       validRows.sort((a, b) => b.parsedDate - a.parsedDate);
 
-      // Current anchor date determined by latest row entry
       const latestDate = validRows[0].parsedDate;
       const currentYear = latestDate.getFullYear();
       const currentMonth = latestDate.getMonth();
       const currentDay = latestDate.getDate();
       
-      // Compute accurate last day of the month (handles leap years, 28, 30, 31)
       const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       const daysRemaining = lastDayOfMonth - currentDay;
 
-      // Filter entries strictly to the active month
       const monthRows = validRows.filter(r => 
         r.parsedDate.getFullYear() === currentYear && r.parsedDate.getMonth() === currentMonth
       );
 
-      // Determine Pending Fixed Bills
       const pendingBills = [];
       let pendingBillsTotal = 0;
 
@@ -404,4 +408,6 @@
         const exactBillDay = bill.day === -1 ? lastDayOfMonth : bill.day;
         if (exactBillDay > currentDay) {
           pendingBills.push({ ...bill, exactDay: exactBillDay });
-          pendingBillsTotal +
+          pendingBillsTotal += bill.amount;
+        }
+      })

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monzo Spending & Projection Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 pb-12 font-sans">
+
+  <div class="max-w-xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="text-center py-4">
+      <h1 class="text-2xl font-bold text-emerald-400">Monzo Analyzer & Forecast</h1>
+      <p class="text-xs text-slate-400 mt-1">100% Private • Local Browser Analysis</p>
+    </header>
+
+    <!-- Upload Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl text-center">
+      <label for="csvFileInput" class="cursor-pointer block">
+        <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+        </div>
+        <span class="text-sm font-medium text-slate-200">Upload Monzo CSV Export</span>
+        <span class="block text-xs text-slate-400 mt-1">Tap here to choose your downloaded Monzo file</span>
+      </label>
+      <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+    </div>
+
+    <!-- Dashboard Content (Hidden until file uploaded) -->
+    <div id="dashboard" class="hidden space-y-6">
+      
+      <!-- Summary Cards Grid -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400 uppercase">Gross Outflow</p>
+          <p id="totalOutflow" class="text-xl font-bold text-rose-400 mt-1">£0.00</p>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400 uppercase">Total Inflow</p>
+          <p id="totalInflow" class="text-xl font-bold text-emerald-400 mt-1">£0.00</p>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400 uppercase">Var. Daily Rate</p>
+          <p id="dailyRate" class="text-xl font-bold text-amber-400 mt-1">£0.00/day</p>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400 uppercase">Fast Food Total</p>
+          <p id="fastFoodTotal" class="text-xl font-bold text-orange-400 mt-1">£0.00</p>
+        </div>
+      </div>
+
+      <!-- Forecast Section -->
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+        <h2 class="text-lg font-semibold text-slate-100 flex items-center justify-between">
+          <span>End-of-Month Forecast</span>
+          <span id="daysRemainingBadge" class="text-xs bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-full">0 days left</span>
+        </h2>
+        
+        <!-- Scenario Comparison -->
+        <div class="space-y-3 pt-2">
+          <!-- Scenario A -->
+          <div class="bg-slate-900/60 p-3.5 rounded-xl border border-rose-500/20 flex justify-between items-center">
+            <div>
+              <p class="text-xs text-slate-400 font-medium">Scenario A (Current Trend)</p>
+              <p class="text-xs text-rose-400/80 mt-0.5">Based on current daily pace</p>
+            </div>
+            <div class="text-right">
+              <p id="scenA_total" class="text-lg font-bold text-rose-400">£0.00</p>
+            </div>
+          </div>
+
+          <!-- Scenario B -->
+          <div class="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20 flex justify-between items-center">
+            <div>
+              <p class="text-xs text-slate-400 font-medium">Scenario B (Target £20/Day)</p>
+              <p class="text-xs text-emerald-400/80 mt-0.5">Disciplined daily variable cap</p>
+            </div>
+            <div class="text-right">
+              <p id="scenB_total" class="text-lg font-bold text-emerald-400">£0.00</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-xl text-center">
+          <p class="text-xs text-slate-300">Targeting Scenario B preserves <span id="projectedSavings" class="font-bold text-emerald-400">£0.00</span> in cash flow this month.</p>
+        </div>
+      </div>
+
+      <!-- Category Chart Card -->
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+        <h2 class="text-base font-semibold text-slate-100 mb-4">Spending by Category</h2>
+        <div class="relative h-64">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Top Merchants List -->
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+        <h2 class="text-base font-semibold text-slate-100 mb-3">Top Merchants</h2>
+        <div id="merchantList" class="divide-y divide-slate-700/60 text-sm">
+          <!-- Dynamic Merchant Rows -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let categoryChartInstance = null;
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          analyzeData(results.data);
+        }
+      });
+    }
+
+    function analyzeData(rows) {
+      // 1. Clean & Deduplicate rows
+      const validRows = rows.filter(r => r.created && r.amount !== undefined && r.amount !== null);
+      
+      if (validRows.length === 0) {
+        alert("No valid Monzo transaction rows found.");
+        return;
+      }
+
+      // Parse dates and amounts
+      validRows.forEach(r => {
+        r.parsedDate = new Date(r.created);
+        r.numAmount = parseFloat(r.amount);
+      });
+
+      // Find current active month from latest date in file
+      validRows.sort((a, b) => b.parsedDate - a.parsedDate);
+      const latestDate = validRows[0].parsedDate;
+      const currentYear = latestDate.getFullYear();
+      const currentMonth = latestDate.getMonth();
+
+      // Filter for latest month's records
+      const monthRows = validRows.filter(r => 
+        r.parsedDate.getFullYear() === currentYear && r.parsedDate.getMonth() === currentMonth
+      );
+
+      // Days elapsed & days remaining calculation
+      const dayOfMonth = latestDate.getDate();
+      const lastDayOfM = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const daysRemaining = lastDayOfM - dayOfMonth;
+
+      // Inflow / Outflow
+      let grossOutflow = 0;
+      let totalInflow = 0;
+      let fastFoodTotal = 0;
+
+      const categoryTotals = {};
+      const merchantTotals = {};
+
+      // Fixed/Excluded titles for daily variable calculation
+      const fixedTitles = ['oh goodlord ltd', 'july overdraft fees', 'puregym', 'flex', 'dominic smith', 'adam d pursell'];
+
+      let variableOutflow = 0;
+
+      monthRows.forEach(r => {
+        const amt = r.numAmount;
+        const title = (r.title || 'Unknown').trim();
+        const category = (r.categories || 'Uncategorized').trim();
+
+        if (amt > 0) {
+          totalInflow += amt;
+        } else if (amt < 0) {
+          const absAmt = Math.abs(amt);
+          grossOutflow += absAmt;
+
+          // Fast food tracking
+          if (title.toLowerCase().includes("mcdonald") || title.toLowerCase().includes("kfc") || title.toLowerCase().includes("uber eats")) {
+            fastFoodTotal += absAmt;
+          }
+
+          // Category aggregation
+          categoryTotals[category] = (categoryTotals[category] || 0) + absAmt;
+
+          // Merchant aggregation
+          merchantTotals[title] = (merchantTotals[title] || 0) + absAmt;
+
+          // Variable spend check
+          if (!fixedTitles.some(ft => title.toLowerCase().includes(ft))) {
+            variableOutflow += absAmt;
+          }
+        }
+      });
+
+      const dailyRate = dayOfMonth > 0 ? (variableOutflow / dayOfMonth) : 0;
+
+      // Scenario Calculations
+      const scenA_var = dailyRate * daysRemaining;
+      const scenB_var = 20.0 * daysRemaining;
+
+      // Add upcoming estimated fixed bills (e.g. Rent £850 + Flex £200)
+      const upcomingFixedEstimate = 850 + 200; 
+
+      const scenA_total = grossOutflow + scenA_var + upcomingFixedEstimate;
+      const scenB_total = grossOutflow + scenB_var + upcomingFixedEstimate;
+      const projectedSavings = Math.max(0, scenA_total - scenB_total);
+
+      // Render UI Metrics
+      document.getElementById('totalOutflow').innerText = `£${grossOutflow.toFixed(2)}`;
+      document.getElementById('totalInflow').innerText = `£${totalInflow.toFixed(2)}`;
+      document.getElementById('dailyRate').innerText = `£${dailyRate.toFixed(2)}/d`;
+      document.getElementById('fastFoodTotal').innerText = `£${fastFoodTotal.toFixed(2)}`;
+
+      document.getElementById('daysRemainingBadge').innerText = `${daysRemaining} days left`;
+      document.getElementById('scenA_total').innerText = `£${scenA_total.toFixed(2)}`;
+      document.getElementById('scenB_total').innerText = `£${scenB_total.toFixed(2)}`;
+      document.getElementById('projectedSavings').innerText = `£${projectedSavings.toFixed(2)}`;
+
+      // Render Top Merchants List
+      const sortedMerchants = Object.entries(merchantTotals).sort((a, b) => b[1] - a[1]).slice(0, 7);
+      const merchantListEl = document.getElementById('merchantList');
+      merchantListEl.innerHTML = sortedMerchants.map(([name, val]) => `
+        <div class="py-2.5 flex justify-between items-center">
+          <span class="text-slate-300 font-medium">${name}</span>
+          <span class="text-rose-400 font-bold">£${val.toFixed(2)}</span>
+        </div>
+      `).join('');
+
+      // Render Chart
+      renderChart(categoryTotals);
+
+      // Show Dashboard
+      document.getElementById('dashboard').classList.remove('hidden');
+    }
+
+    function renderChart(categoryTotals) {
+      const ctx = document.getElementById('categoryChart').getContext('2d');
+      const labels = Object.keys(categoryTotals);
+      const data = Object.values(categoryTotals);
+
+      if (categoryChartInstance) {
+        categoryChartInstance.destroy();
+      }
+
+      categoryChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: [
+              '#f43f5e', '#3b82f6', '#10b981', '#f59e0b', 
+              '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'
+            ],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#94a3b8', boxWidth: 12, padding: 15 }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

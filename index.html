@@ -43,15 +43,14 @@
       <div class="space-y-4">
         <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Statement Data</h2>
         
-        <!-- Bulletproof Label Wrapper with Broad Acceptance Filter -->
-        <label class="block bg-slate-950 border-2 border-dashed border-slate-800 hover:border-emerald-500/60 rounded-2xl p-6 text-center cursor-pointer transition-all">
+        <!-- Bulletproof Dropzone Container with Explicit Click Binding -->
+        <div id="dropzoneBox" class="bg-slate-950 border-2 border-dashed border-slate-800 hover:border-emerald-500/60 rounded-2xl p-6 text-center cursor-pointer transition-all">
           <input type="file" id="csvFileInput" accept=".csv, .txt, text/*, application/vnd.ms-excel, application/csv, */*" class="hidden">
-          
-          <div class="w-10 h-10 bg-slate-900 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2">
+          <div class="w-10 h-10 bg-slate-900 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2 pointer-events-none">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           </div>
-          <span id="fileNameLabel" class="text-xs font-medium text-slate-300 block">Select CSV Statement (Downloads / Google Drive)</span>
-        </label>
+          <span id="fileNameLabel" class="text-xs font-medium text-slate-300 block pointer-events-none">Select Monzo CSV Statement</span>
+        </div>
       </div>
 
       <button id="analyseBtn" disabled class="w-full py-4 px-4 bg-slate-800 text-slate-500 font-semibold rounded-xl cursor-not-allowed transition-all">
@@ -309,6 +308,7 @@
     const DOM = {
       viewSetup: document.getElementById('view-setup'),
       viewDashboard: document.getElementById('view-dashboard'),
+      dropzoneBox: document.getElementById('dropzoneBox'),
       fileInput: document.getElementById('csvFileInput'),
       analyseBtn: document.getElementById('analyseBtn'),
       backBtn: document.getElementById('backBtn'),
@@ -326,12 +326,17 @@
       DOM.mainBalInput.addEventListener('input', e => localStorage.setItem('monzo_mainBal', e.target.value));
       DOM.flexBalInput.addEventListener('input', e => localStorage.setItem('monzo_flexBal', e.target.value));
 
+      // Explicit click binding guarantees file picker opens regardless of browser/device quirks
+      DOM.dropzoneBox.addEventListener('click', () => {
+        DOM.fileInput.click();
+      });
+
       DOM.fileInput.addEventListener('change', e => {
         const file = e.target.files?.[0];
         if (!file) return;
         appState.selectedFile = file;
         DOM.fileNameLabel.innerText = "Selected: " + file.name;
-        DOM.fileNameLabel.className = "text-xs font-semibold text-emerald-400 block";
+        DOM.fileNameLabel.className = "text-xs font-semibold text-emerald-400 block pointer-events-none";
         DOM.analyseBtn.disabled = false;
         DOM.analyseBtn.className = "w-full py-4 px-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-500 cursor-pointer shadow-lg";
       });

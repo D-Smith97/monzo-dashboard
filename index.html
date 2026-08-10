@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monzo Spending & Forecast App</title>
+  <title>Monzo Spending & Headroom Command Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -13,34 +13,111 @@
   <div class="max-w-xl mx-auto space-y-6">
     
     <!-- Header -->
-    <header class="text-center py-4">
-      <h1 class="text-2xl font-bold text-emerald-400">Monzo Analyzer & Forecast</h1>
-      <p class="text-xs text-slate-400 mt-1">100% Private • Local Browser Analysis</p>
+    <header class="text-center py-2">
+      <h1 class="text-2xl font-bold text-emerald-400">Financial Command Center</h1>
+      <p class="text-xs text-slate-400 mt-1">100% Local • Private • Headroom Tracking</p>
     </header>
 
-    <!-- Step 1: Upload & Action Card -->
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl text-center space-y-4">
+    <!-- Account Setup & Balances Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">1. Current Live Balances</h2>
+      
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Main Account Balance (£)</label>
+          <input type="number" id="mainBalInput" placeholder="-1250.00" step="0.01" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+            onchange="saveAccountInputs()">
+          <span class="text-[10px] text-slate-500">Use negative for overdraft</span>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Monzo Flex Balance (£)</label>
+          <input type="number" id="flexBalInput" placeholder="600.00" step="0.01" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+            onchange="saveAccountInputs()">
+          <span class="text-[10px] text-slate-500">Current Flex debt</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CSV Selection & Trigger -->
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl text-center space-y-4">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300 text-left">2. Import Monzo Statement</h2>
       <div>
-        <label for="csvFileInput" class="cursor-pointer block bg-slate-900/80 border border-dashed border-slate-600 hover:border-emerald-500 p-6 rounded-xl transition-all">
-          <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+        <label for="csvFileInput" class="cursor-pointer block bg-slate-900/80 border border-dashed border-slate-600 hover:border-emerald-500 p-5 rounded-xl transition-all">
+          <div class="w-10 h-10 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           </div>
           <span id="fileNameLabel" class="text-sm font-medium text-slate-200">Tap to Select Monzo CSV</span>
-          <span class="block text-xs text-slate-400 mt-1">Select file from Pixel Downloads</span>
         </label>
         <input type="file" id="csvFileInput" accept=".csv, text/csv, text/plain, application/csv, text/comma-separated-values, application/vnd.ms-excel, */*" class="hidden" onchange="fileSelected(event)">
       </div>
 
-      <!-- Action Button -->
       <button id="analyzeBtn" onclick="runAnalysis()" disabled class="w-full py-3 px-4 bg-emerald-600 opacity-50 cursor-not-allowed text-white font-semibold rounded-xl shadow-lg transition-all">
-        Run Analysis & Generate Dashboard
+        Run Complete Financial Forecast
       </button>
     </div>
 
-    <!-- Dashboard Content (Hidden until Analyze is pressed) -->
+    <!-- Dashboard Content -->
     <div id="dashboard" class="hidden space-y-6">
       
-      <!-- Key Metrics -->
+      <!-- Headroom & Credit Limits Summary -->
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+        <h2 class="text-base font-semibold text-slate-100">Facility Limits & Credit Headroom</h2>
+        
+        <!-- Overdraft Bar -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs">
+            <span class="text-slate-400">Overdraft (£2,000 Limit)</span>
+            <span id="odUsageText" class="font-bold text-slate-200">£0 / £2,000</span>
+          </div>
+          <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
+            <div id="odProgressBar" class="bg-amber-500 h-2.5 rounded-full" style="width: 0%"></div>
+          </div>
+          <p id="odHeadroomText" class="text-[11px] text-slate-400 text-right">Headroom: £0.00</p>
+        </div>
+
+        <!-- Flex Bar -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs">
+            <span class="text-slate-400">Monzo Flex (£3,000 Limit)</span>
+            <span id="flexUsageText" class="font-bold text-slate-200">£0 / £3,000</span>
+          </div>
+          <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
+            <div id="flexProgressBar" class="bg-rose-500 h-2.5 rounded-full" style="width: 0%"></div>
+          </div>
+          <p id="flexHeadroomText" class="text-[11px] text-slate-400 text-right">Headroom: £0.00</p>
+        </div>
+      </div>
+
+      <!-- Pre-Payday Forecast Card -->
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+        <div class="flex justify-between items-center">
+          <h2 class="text-base font-semibold text-slate-100">Pre-Payday Projection</h2>
+          <span id="daysRemainingBadge" class="text-xs bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-full">0 days left</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-slate-900/80 p-3.5 rounded-xl border border-rose-500/30">
+            <p class="text-[11px] text-slate-400 uppercase font-medium">Scenario A (Current Pace)</p>
+            <p id="scenA_prePayday" class="text-lg font-bold text-rose-400 mt-1">£0.00</p>
+            <p id="scenA_odHeadroom" class="text-[10px] text-slate-400 mt-1">OD Buffer: £0.00</p>
+          </div>
+
+          <div class="bg-slate-900/80 p-3.5 rounded-xl border border-emerald-500/30">
+            <p class="text-[11px] text-slate-400 uppercase font-medium">Scenario B (£20/Day Cap)</p>
+            <p id="scenB_prePayday" class="text-lg font-bold text-emerald-400 mt-1">£0.00</p>
+            <p id="scenB_odHeadroom" class="text-[10px] text-slate-400 mt-1">OD Buffer: £0.00</p>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/40 border border-slate-700 p-3 rounded-xl text-center">
+          <p class="text-xs text-slate-300">Pacing at Scenario B preserves <span id="projectedSavings" class="font-bold text-emerald-400">£0.00</span> extra cash before payday.</p>
+        </div>
+      </div>
+
+      <!-- Spending Metrics Grid -->
       <div class="grid grid-cols-2 gap-3">
         <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
           <p class="text-xs font-medium text-slate-400 uppercase">Gross Outflow</p>
@@ -60,43 +137,7 @@
         </div>
       </div>
 
-      <!-- End of Month Forecast -->
-      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
-        <h2 class="text-lg font-semibold text-slate-100 flex items-center justify-between">
-          <span>End-of-Month Forecast</span>
-          <span id="daysRemainingBadge" class="text-xs bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-full">0 days left</span>
-        </h2>
-        
-        <div class="space-y-3 pt-2">
-          <!-- Scenario A -->
-          <div class="bg-slate-900/60 p-3.5 rounded-xl border border-rose-500/20 flex justify-between items-center">
-            <div>
-              <p class="text-xs text-slate-400 font-medium">Scenario A (Current Trend)</p>
-              <p class="text-xs text-rose-400/80 mt-0.5">Based on current daily pace</p>
-            </div>
-            <div class="text-right">
-              <p id="scenA_total" class="text-lg font-bold text-rose-400">£0.00</p>
-            </div>
-          </div>
-
-          <!-- Scenario B -->
-          <div class="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20 flex justify-between items-center">
-            <div>
-              <p class="text-xs text-slate-400 font-medium">Scenario B (Target £20/Day)</p>
-              <p class="text-xs text-emerald-400/80 mt-0.5">Disciplined daily variable cap</p>
-            </div>
-            <div class="text-right">
-              <p id="scenB_total" class="text-lg font-bold text-emerald-400">£0.00</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-xl text-center">
-          <p class="text-xs text-slate-300">Targeting Scenario B preserves <span id="projectedSavings" class="font-bold text-emerald-400">£0.00</span> in cash flow this month.</p>
-        </div>
-      </div>
-
-      <!-- Spending Breakdown Chart -->
+      <!-- Category Breakdown Chart -->
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
         <h2 class="text-base font-semibold text-slate-100 mb-4">Category Breakdown</h2>
         <div class="relative h-64">
@@ -116,6 +157,18 @@
   <script>
     let selectedFile = null;
     let categoryChartInstance = null;
+
+    // Load saved balances on launch
+    window.onload = function() {
+      if(localStorage.getItem('mainBal')) document.getElementById('mainBalInput').value = localStorage.getItem('mainBal');
+      if(localStorage.getItem('flexBal')) document.getElementById('flexBalInput').value = localStorage.getItem('flexBal');
+    };
+
+    function saveAccountInputs() {
+      localStorage.setItem('mainBal', document.getElementById('mainBalInput').value);
+      localStorage.setItem('flexBal', document.getElementById('flexBalInput').value);
+      if (selectedFile) runAnalysis();
+    }
 
     function fileSelected(event) {
       selectedFile = event.target.files[0];
@@ -144,7 +197,7 @@
     function analyzeData(rows) {
       const validRows = rows.filter(r => r.created && r.amount !== undefined && r.amount !== null);
       if (validRows.length === 0) {
-        alert("No valid Monzo transactions found in file.");
+        alert("No valid Monzo transactions found.");
         return;
       }
 
@@ -200,23 +253,56 @@
       });
 
       const dailyRate = dayOfMonth > 0 ? (variableOutflow / dayOfMonth) : 0;
-      const scenA_var = dailyRate * daysRemaining;
-      const scenB_var = 20.0 * daysRemaining;
-      const upcomingFixedEstimate = 850 + 200; // Rent + Flex
+      
+      // User Account Inputs & Limits
+      const currentMainBal = parseFloat(document.getElementById('mainBalInput').value) || 0.00;
+      const currentFlexBal = parseFloat(document.getElementById('flexBalInput').value) || 0.00;
+      const odLimit = 2000.00;
+      const flexLimit = 3000.00;
 
-      const scenA_total = grossOutflow + scenA_var + upcomingFixedEstimate;
-      const scenB_total = grossOutflow + scenB_var + upcomingFixedEstimate;
-      const projectedSavings = Math.max(0, scenA_total - scenB_total);
+      // Update Headroom UI
+      const odUsed = currentMainBal < 0 ? Math.min(odLimit, Math.abs(currentMainBal)) : 0;
+      const odHeadroom = odLimit - odUsed;
+      const odPct = Math.min(100, (odUsed / odLimit) * 100);
+
+      document.getElementById('odUsageText').innerText = `£${odUsed.toFixed(2)} / £2,000`;
+      document.getElementById('odProgressBar').style.width = `${odPct}%`;
+      document.getElementById('odHeadroomText').innerText = `Remaining OD Buffer: £${odHeadroom.toFixed(2)}`;
+
+      const flexPct = Math.min(100, (currentFlexBal / flexLimit) * 100);
+      const flexHeadroom = flexLimit - currentFlexBal;
+
+      document.getElementById('flexUsageText').innerText = `£${currentFlexBal.toFixed(2)} / £3,000`;
+      document.getElementById('flexProgressBar').style.width = `${flexPct}%`;
+      document.getElementById('flexHeadroomText').innerText = `Available Flex Limit: £${flexHeadroom.toFixed(2)}`;
+
+      // Scenario Calculations relative to Live Balance
+      const upcomingFixedEstimate = 0; // Fixed bills remaining this month
+      const scenA_remainingSpend = (dailyRate * daysRemaining) + upcomingFixedEstimate;
+      const scenB_remainingSpend = (20.0 * daysRemaining) + upcomingFixedEstimate;
+
+      const scenA_prePayday = currentMainBal - scenA_remainingSpend;
+      const scenB_prePayday = currentMainBal - scenB_remainingSpend;
+
+      const scenA_odBuffer = odLimit + scenA_prePayday;
+      const scenB_odBuffer = odLimit + scenB_prePayday;
+
+      const projectedSavings = Math.max(0, scenB_prePayday - scenA_prePayday);
+
+      // Render Outputs
+      document.getElementById('scenA_prePayday').innerText = `£${scenA_prePayday.toFixed(2)}`;
+      document.getElementById('scenA_odHeadroom').innerText = `OD Buffer: £${Math.max(0, scenA_odBuffer).toFixed(2)}`;
+
+      document.getElementById('scenB_prePayday').innerText = `£${scenB_prePayday.toFixed(2)}`;
+      document.getElementById('scenB_odHeadroom').innerText = `OD Buffer: £${Math.max(0, scenB_odBuffer).toFixed(2)}`;
+
+      document.getElementById('projectedSavings').innerText = `£${projectedSavings.toFixed(2)}`;
 
       document.getElementById('totalOutflow').innerText = `£${grossOutflow.toFixed(2)}`;
       document.getElementById('totalInflow').innerText = `£${totalInflow.toFixed(2)}`;
       document.getElementById('dailyRate').innerText = `£${dailyRate.toFixed(2)}/d`;
       document.getElementById('fastFoodTotal').innerText = `£${fastFoodTotal.toFixed(2)}`;
-
       document.getElementById('daysRemainingBadge').innerText = `${daysRemaining} days left`;
-      document.getElementById('scenA_total').innerText = `£${scenA_total.toFixed(2)}`;
-      document.getElementById('scenB_total').innerText = `£${scenB_total.toFixed(2)}`;
-      document.getElementById('projectedSavings').innerText = `£${projectedSavings.toFixed(2)}`;
 
       const sortedMerchants = Object.entries(merchantTotals).sort((a, b) => b[1] - a[1]).slice(0, 7);
       document.getElementById('merchantList').innerHTML = sortedMerchants.map(([name, val]) => `

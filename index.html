@@ -28,7 +28,7 @@
 
     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
       
-      <!-- Live Balances (Persisted in LocalStorage) -->
+      <!-- Live Balances -->
       <div class="space-y-4">
         <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Live Balances</h2>
         <div>
@@ -46,18 +46,15 @@
 
       <hr class="border-slate-800">
 
-      <!-- Statement File Upload (Mobile & Google Drive Optimised) -->
+      <!-- Statement File Upload -->
       <div class="space-y-4">
         <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Statement Data</h2>
         
-        <div class="relative bg-slate-950 border-2 border-dashed border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/5 rounded-2xl p-8 text-center transition-all cursor-pointer">
-          <!-- Direct overlay input to ensure mobile touch compatibility -->
-          <input type="file" id="csvFileInput" accept=".csv, .txt, text/*, application/vnd.ms-excel, application/csv, */*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-          
-          <div class="w-12 h-12 bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 pointer-events-none">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-          </div>
-          <span id="fileNameLabel" class="text-sm font-medium text-slate-300 pointer-events-none block">Select CSV Statement (Downloads / Google Drive)</span>
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 text-center space-y-3">
+          <label for="csvFileInput" class="block text-sm font-medium text-slate-300">Select Statement File</label>
+          <input type="file" id="csvFileInput" accept=".csv, .txt, text/*, application/vnd.ms-excel, application/csv, */*" 
+            class="block w-full text-xs text-slate-400 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer">
+          <p id="fileNameLabel" class="text-xs text-slate-500 mt-1">No file selected yet</p>
         </div>
       </div>
 
@@ -88,7 +85,7 @@
     <!-- Main Layout Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      <!-- LEFT COLUMN: Limits & Fixed Outgoings -->
+      <!-- LEFT COLUMN -->
       <div class="space-y-6 lg:col-span-1">
         
         <!-- Credit Limits & Headroom -->
@@ -118,20 +115,18 @@
           </div>
         </div>
 
-        <!-- Pending Hardcoded Outgoings List -->
+        <!-- Pending Outgoings -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col h-auto">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-sm font-bold uppercase tracking-widest text-slate-500">Pending Outgoings</h2>
             <span id="pendingBillsTotal" class="text-sm font-bold text-amber-400 bg-amber-400/10 px-3 py-1 rounded-lg">£0.00</span>
           </div>
           <p class="text-xs text-slate-400 mb-4 pb-4 border-b border-slate-800">Fixed outgoings remaining before next payday.</p>
-          <div id="pendingBillsList" class="space-y-3 flex-grow">
-            <!-- Populated dynamically -->
-          </div>
+          <div id="pendingBillsList" class="space-y-3 flex-grow"></div>
         </div>
       </div>
 
-      <!-- RIGHT COLUMN: Forecasting Models & Analytics -->
+      <!-- RIGHT COLUMN -->
       <div class="space-y-6 lg:col-span-2">
         
         <!-- Pre-Payday Forecast Model -->
@@ -150,7 +145,6 @@
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-            <!-- Scenario A -->
             <div class="bg-slate-950/50 p-5 rounded-xl border border-rose-500/20 shadow-inner">
               <div class="flex justify-between items-start mb-2">
                 <p class="text-xs text-slate-400 uppercase tracking-wider font-bold">Scenario A: Current Pace</p>
@@ -160,7 +154,6 @@
               <p id="scenA_odHeadroom" class="text-sm text-slate-400 font-medium">Remaining Overdraft: <span class="text-rose-400">£0.00</span></p>
             </div>
 
-            <!-- Scenario B -->
             <div class="bg-slate-950/50 p-5 rounded-xl border border-emerald-500/20 shadow-inner">
               <div class="flex justify-between items-start mb-2">
                 <p class="text-xs text-slate-400 uppercase tracking-wider font-bold">Scenario B: £20/Day Cap</p>
@@ -174,7 +167,6 @@
 
         <!-- Metrics Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
           <div class="grid grid-cols-2 gap-4">
             <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-center shadow-lg">
               <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Gross Outflow</p>
@@ -197,9 +189,7 @@
           <!-- Top Merchants -->
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
             <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Top Merchants (Variable)</h2>
-            <div id="merchantList" class="space-y-3 text-sm">
-              <!-- Populated dynamically -->
-            </div>
+            <div id="merchantList" class="space-y-3 text-sm"></div>
           </div>
         </div>
 
@@ -215,13 +205,7 @@
     </div>
   </div>
 
-  <!-- ==========================================
-       APPLICATION CORE SCRIPT
-       ========================================== -->
   <script>
-    /**
-     * CONFIGURATION
-     */
     const CONFIG = {
       limits: { overdraft: 2000, flex: 3000 },
       income: { name: 'Work Payday', amount: 2308.11, day: -1 },
@@ -235,13 +219,8 @@
       excludeFromVariable: ['goodlord', 'amazon', 'spotify', 'o2', 'monzo perks', 'flex', 'apple', 'puregym', 'dominic smith']
     };
 
-    // Global State
-    let appState = {
-      selectedFile: null,
-      chartInstance: null
-    };
+    let appState = { selectedFile: null, chartInstance: null };
 
-    // DOM References
     const DOM = {
       viewSetup: document.getElementById('view-setup'),
       viewDashboard: document.getElementById('view-dashboard'),
@@ -253,9 +232,6 @@
       fileNameLabel: document.getElementById('fileNameLabel')
     };
 
-    /**
-     * INIT & STATE PERSISTENCE
-     */
     function init() {
       const savedMain = localStorage.getItem('monzo_mainBal');
       const savedFlex = localStorage.getItem('monzo_flexBal');
@@ -266,27 +242,27 @@
       DOM.mainBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_mainBal', e.target.value));
       DOM.flexBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_flexBal', e.target.value));
 
+      // Listen to both change and input events for Android compatibility
       DOM.fileInput.addEventListener('change', handleFileSelect);
+      DOM.fileInput.addEventListener('input', handleFileSelect);
+
       DOM.analyseBtn.addEventListener('click', executeAnalysis);
       DOM.backBtn.addEventListener('click', showSetupView);
     }
 
     function handleFileSelect(e) {
-      const file = e.target.files[0];
+      const file = e.target.files && e.target.files[0];
       if (!file) return;
       
       appState.selectedFile = file;
-      DOM.fileNameLabel.innerText = file.name;
-      DOM.fileNameLabel.classList.add('text-emerald-400');
+      DOM.fileNameLabel.innerText = "Selected: " + file.name;
+      DOM.fileNameLabel.className = "text-xs text-emerald-400 font-bold mt-1";
       
       DOM.analyseBtn.disabled = false;
       DOM.analyseBtn.classList.remove('bg-slate-800', 'text-slate-500', 'cursor-not-allowed');
       DOM.analyseBtn.classList.add('bg-emerald-600', 'text-white', 'hover:bg-emerald-500', 'shadow-[0_0_20px_rgba(16,185,129,0.3)]', 'cursor-pointer');
     }
 
-    /**
-     * SPA ROUTER
-     */
     function showDashboardView() {
       DOM.viewSetup.classList.remove('fade-in');
       DOM.viewSetup.classList.add('fade-out');
@@ -314,16 +290,12 @@
       }, 350);
     }
 
-    /**
-     * MOBILE-OPTIMISED PARSER ENGINE
-     */
     function executeAnalysis() {
       if (!appState.selectedFile) {
         alert("Please select a valid Monzo CSV statement file first.");
         return;
       }
 
-      // Read file text via native FileReader to avoid mobile stream issues with Drive files
       const reader = new FileReader();
       
       reader.onload = function(evt) {
@@ -357,7 +329,7 @@
       };
 
       reader.onerror = function() {
-        alert("Unable to read the file from device storage. Please try re-selecting the file.");
+        alert("Unable to read file from storage. Please try re-selecting it.");
       };
 
       reader.readAsText(appState.selectedFile);
@@ -410,4 +382,31 @@
           pendingBills.push({ ...bill, exactDay: exactBillDay });
           pendingBillsTotal += bill.amount;
         }
-      })
+      });
+
+      let grossOutflow = 0;
+      let totalInflow = 0;
+      let fastFoodTotal = 0;
+      let variableOutflow = 0;
+      const categoryTotals = {};
+      const merchantTotals = {};
+
+      monthRows.forEach(r => {
+        const amt = r[amountKey];
+        const title = (r[titleKey] || 'Unknown').toString().trim().toLowerCase();
+        const category = (r[categoryKey] || 'Uncategorised').toString().trim();
+
+        if (amt > 0) {
+          totalInflow += amt;
+        } else if (amt < 0) {
+          const absAmt = Math.abs(amt);
+          grossOutflow += absAmt;
+
+          if (title.includes("mcdonald") || title.includes("kfc") || title.includes("uber eats") || title.includes("deliveroo")) {
+            fastFoodTotal += absAmt;
+          }
+
+          const isExcluded = CONFIG.excludeFromVariable.some(kw => title.includes(kw));
+          if (!isExcluded) {
+            variableOutflow += absAmt;
+            categoryTotals[category] = (categoryTotals[category]

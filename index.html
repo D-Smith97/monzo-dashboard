@@ -3,293 +3,386 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monzo Spending & Headroom Command Center</title>
+  <title>Monzo Command Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Smooth view transitions */
+    .view-transition { transition: opacity 0.4s ease, transform 0.4s ease; }
+    .fade-out { opacity: 0; transform: translateY(-10px); pointer-events: none; position: absolute; w-full; }
+    .fade-in { opacity: 1; transform: translateY(0); }
+    .hidden-view { display: none !important; }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 pb-12 font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans overflow-x-hidden selection:bg-emerald-500/30">
 
-  <div class="max-w-xl mx-auto space-y-6">
-    
-    <!-- Header -->
-    <header class="text-center py-2">
-      <h1 class="text-2xl font-bold text-emerald-400">Financial Command Center</h1>
-      <p class="text-xs text-slate-400 mt-1">100% Local • Private • Full Outgoings Forecasting</p>
+  <!-- ==========================================
+       VIEW 1: SETUP & UPLOAD SCREEN
+       ========================================== -->
+  <div id="view-setup" class="max-w-md mx-auto mt-20 p-4 view-transition fade-in">
+    <header class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-emerald-400 tracking-tight">Monzo Command</h1>
+      <p class="text-sm text-slate-400 mt-2">Local Financial Forecasting Engine</p>
     </header>
 
-    <!-- Account Setup & Balances Card -->
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
-      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">1. Current Live Balances</h2>
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
       
-      <div class="grid grid-cols-2 gap-3">
+      <!-- Balances -->
+      <div class="space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Live Balances</h2>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Main Account Balance (£)</label>
+          <label class="block text-sm text-slate-300 mb-1.5">Main Account (£)</label>
           <input type="number" id="mainBalInput" placeholder="-1250.00" step="0.01" 
-            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
-            onchange="saveAccountInputs()">
-          <span class="text-[10px] text-slate-500">Use negative for overdraft</span>
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+          <p class="text-[10px] text-slate-500 mt-1 pl-1">Use negative values if in overdraft</p>
         </div>
-
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Monzo Flex Balance (£)</label>
+          <label class="block text-sm text-slate-300 mb-1.5">Flex Debt (£)</label>
           <input type="number" id="flexBalInput" placeholder="600.00" step="0.01" 
-            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
-            onchange="saveAccountInputs()">
-          <span class="text-[10px] text-slate-500">Current Flex debt</span>
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-700 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all">
         </div>
       </div>
-    </div>
 
-    <!-- Upcoming Fixed Outgoings Card -->
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
-      <div class="flex justify-between items-center">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">2. Remaining Fixed Outgoings</h2>
-        <span id="fixedTotalBadge" class="text-xs bg-slate-700 text-amber-300 px-2.5 py-1 rounded-full font-bold">Total Due: £0.00</span>
-      </div>
-      <p class="text-xs text-slate-400">Enter bills, subscriptions, and financing payments still due before payday.</p>
+      <hr class="border-slate-800">
 
-      <div class="grid grid-cols-3 gap-2">
-        <div>
-          <label class="block text-[11px] text-slate-400 mb-1">Tech / Mac (£)</label>
-          <input type="number" id="fixedTechInput" placeholder="50.00" step="0.01" 
-            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
-            onchange="saveAccountInputs()">
-        </div>
-
-        <div>
-          <label class="block text-[11px] text-slate-400 mb-1">Bills & DDs (£)</label>
-          <input type="number" id="fixedBillsInput" placeholder="250.00" step="0.01" 
-            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
-            onchange="saveAccountInputs()">
-        </div>
-
-        <div>
-          <label class="block text-[11px] text-slate-400 mb-1">Subs & Other (£)</label>
-          <input type="number" id="fixedSubsInput" placeholder="40.00" step="0.01" 
-            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
-            onchange="saveAccountInputs()">
-        </div>
-      </div>
-    </div>
-
-    <!-- CSV Selection & Trigger -->
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl text-center space-y-4">
-      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300 text-left">3. Import Monzo Statement</h2>
-      <div>
-        <label for="csvFileInput" class="cursor-pointer block bg-slate-900/80 border border-dashed border-slate-600 hover:border-emerald-500 p-5 rounded-xl transition-all">
-          <div class="w-10 h-10 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+      <!-- File Upload -->
+      <div class="space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Statement Data</h2>
+        <label for="csvFileInput" class="cursor-pointer group block bg-slate-950 border-2 border-dashed border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/5 rounded-2xl p-8 text-center transition-all">
+          <div class="w-12 h-12 bg-slate-800 group-hover:bg-emerald-500/20 text-slate-400 group-hover:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           </div>
-          <span id="fileNameLabel" class="text-sm font-medium text-slate-200">Tap to Select Monzo CSV</span>
+          <span id="fileNameLabel" class="text-sm font-medium text-slate-300 group-hover:text-emerald-400 transition-colors">Select CSV Statement</span>
         </label>
-        <input type="file" id="csvFileInput" accept=".csv, text/csv, text/plain, application/csv, text/comma-separated-values, application/vnd.ms-excel, */*" class="hidden" onchange="fileSelected(event)">
+        <input type="file" id="csvFileInput" accept=".csv, text/csv, text/plain, application/csv, */*" class="hidden">
       </div>
 
-      <button id="analyzeBtn" onclick="runAnalysis()" disabled class="w-full py-3 px-4 bg-emerald-600 opacity-50 cursor-not-allowed text-white font-semibold rounded-xl shadow-lg transition-all">
-        Run Complete Financial Forecast
+      <button id="analyzeBtn" disabled class="w-full py-4 px-4 bg-slate-800 text-slate-500 font-semibold rounded-xl transition-all duration-300 ease-out flex justify-center items-center gap-2">
+        <span>Initialize Dashboard</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
       </button>
-    </div>
-
-    <!-- Dashboard Content -->
-    <div id="dashboard" class="hidden space-y-6">
-      
-      <!-- Headroom & Credit Limits Summary -->
-      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
-        <h2 class="text-base font-semibold text-slate-100">Facility Limits & Credit Headroom</h2>
-        
-        <!-- Overdraft Bar -->
-        <div class="space-y-1.5">
-          <div class="flex justify-between text-xs">
-            <span class="text-slate-400">Overdraft (£2,000 Limit)</span>
-            <span id="odUsageText" class="font-bold text-slate-200">£0 / £2,000</span>
-          </div>
-          <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
-            <div id="odProgressBar" class="bg-amber-500 h-2.5 rounded-full" style="width: 0%"></div>
-          </div>
-          <p id="odHeadroomText" class="text-[11px] text-slate-400 text-right">Headroom: £0.00</p>
-        </div>
-
-        <!-- Flex Bar -->
-        <div class="space-y-1.5">
-          <div class="flex justify-between text-xs">
-            <span class="text-slate-400">Monzo Flex (£3,000 Limit)</span>
-            <span id="flexUsageText" class="font-bold text-slate-200">£0 / £3,000</span>
-          </div>
-          <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
-            <div id="flexProgressBar" class="bg-rose-500 h-2.5 rounded-full" style="width: 0%"></div>
-          </div>
-          <p id="flexHeadroomText" class="text-[11px] text-slate-400 text-right">Headroom: £0.00</p>
-        </div>
-      </div>
-
-      <!-- Pre-Payday Forecast Card -->
-      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
-        <div class="flex justify-between items-center">
-          <h2 class="text-base font-semibold text-slate-100">Pre-Payday Forecast</h2>
-          <span id="daysRemainingBadge" class="text-xs bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-full">0 days left</span>
-        </div>
-
-        <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700 text-xs text-slate-300 flex justify-between items-center">
-          <span>Ring-fenced Fixed Outgoings Due:</span>
-          <span id="summaryFixedOutgoings" class="font-bold text-amber-400">£0.00</span>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-slate-900/80 p-3.5 rounded-xl border border-rose-500/30">
-            <p class="text-[11px] text-slate-400 uppercase font-medium">Scenario A (Current Pace)</p>
-            <p id="scenA_prePayday" class="text-lg font-bold text-rose-400 mt-1">£0.00</p>
-            <p id="scenA_odHeadroom" class="text-[10px] text-slate-400 mt-1">OD Buffer: £0.00</p>
-          </div>
-
-          <div class="bg-slate-900/80 p-3.5 rounded-xl border border-emerald-500/30">
-            <p class="text-[11px] text-slate-400 uppercase font-medium">Scenario B (£20/Day Cap)</p>
-            <p id="scenB_prePayday" class="text-lg font-bold text-emerald-400 mt-1">£0.00</p>
-            <p id="scenB_odHeadroom" class="text-[10px] text-slate-400 mt-1">OD Buffer: £0.00</p>
-          </div>
-        </div>
-
-        <div class="bg-slate-900/40 border border-slate-700 p-3 rounded-xl text-center">
-          <p class="text-xs text-slate-300">Pacing at Scenario B preserves <span id="projectedSavings" class="font-bold text-emerald-400">£0.00</span> extra cash before payday.</p>
-        </div>
-      </div>
-
-      <!-- Spending Metrics Grid -->
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs font-medium text-slate-400 uppercase">Gross Outflow</p>
-          <p id="totalOutflow" class="text-xl font-bold text-rose-400 mt-1">£0.00</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs font-medium text-slate-400 uppercase">Total Inflow</p>
-          <p id="totalInflow" class="text-xl font-bold text-emerald-400 mt-1">£0.00</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs font-medium text-slate-400 uppercase">Var. Daily Rate</p>
-          <p id="dailyRate" class="text-xl font-bold text-amber-400 mt-1">£0.00/day</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs font-medium text-slate-400 uppercase">Fast Food Total</p>
-          <p id="fastFoodTotal" class="text-xl font-bold text-orange-400 mt-1">£0.00</p>
-        </div>
-      </div>
-
-      <!-- Category Breakdown Chart -->
-      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
-        <h2 class="text-base font-semibold text-slate-100 mb-4">Category Breakdown</h2>
-        <div class="relative h-64">
-          <canvas id="categoryChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Top Merchants List -->
-      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
-        <h2 class="text-base font-semibold text-slate-100 mb-3">Top Merchants</h2>
-        <div id="merchantList" class="divide-y divide-slate-700/60 text-sm"></div>
-      </div>
-
     </div>
   </div>
 
-  <script>
-    let selectedFile = null;
-    let categoryChartInstance = null;
+  <!-- ==========================================
+       VIEW 2: MAIN DASHBOARD SCREEN
+       ========================================== -->
+  <div id="view-dashboard" class="max-w-6xl mx-auto p-4 lg:p-8 view-transition hidden-view opacity-0">
+    
+    <!-- Dashboard Header -->
+    <header class="flex justify-between items-center mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-emerald-400">Financial Forecast</h1>
+        <p id="dashboardDateText" class="text-sm text-slate-400 mt-1">Calculating...</p>
+      </div>
+      <button id="backBtn" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        Back to Setup
+      </button>
+    </header>
 
-    // Load saved balances and fixed outgoings on launch
-    window.onload = function() {
-      if(localStorage.getItem('mainBal')) document.getElementById('mainBalInput').value = localStorage.getItem('mainBal');
-      if(localStorage.getItem('flexBal')) document.getElementById('flexBalInput').value = localStorage.getItem('flexBal');
-      if(localStorage.getItem('fixedTech')) document.getElementById('fixedTechInput').value = localStorage.getItem('fixedTech');
-      if(localStorage.getItem('fixedBills')) document.getElementById('fixedBillsInput').value = localStorage.getItem('fixedBills');
-      if(localStorage.getItem('fixedSubs')) document.getElementById('fixedSubsInput').value = localStorage.getItem('fixedSubs');
+    <!-- Main Grid Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      updateFixedTotalBadge();
+      <!-- LEFT COLUMN: Limits & Pending Bills -->
+      <div class="space-y-6 lg:col-span-1">
+        
+        <!-- Credit Limits -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-5">
+          <h2 class="text-sm font-bold uppercase tracking-widest text-slate-500">Credit Headroom</h2>
+          
+          <div class="space-y-2">
+            <div class="flex justify-between items-end">
+              <span class="text-sm text-slate-300 font-medium">Overdraft</span>
+              <span id="odUsageText" class="text-sm font-bold text-slate-100">£0 / £2,000</span>
+            </div>
+            <div class="w-full bg-slate-950 rounded-full h-3 overflow-hidden border border-slate-800">
+              <div id="odProgressBar" class="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full" style="width: 0%"></div>
+            </div>
+            <p id="odHeadroomText" class="text-xs text-emerald-400 text-right font-medium">Buffer: £0.00</p>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex justify-between items-end">
+              <span class="text-sm text-slate-300 font-medium">Monzo Flex</span>
+              <span id="flexUsageText" class="text-sm font-bold text-slate-100">£0 / £3,000</span>
+            </div>
+            <div class="w-full bg-slate-950 rounded-full h-3 overflow-hidden border border-slate-800">
+              <div id="flexProgressBar" class="bg-gradient-to-r from-rose-500 to-rose-400 h-full rounded-full" style="width: 0%"></div>
+            </div>
+            <p id="flexHeadroomText" class="text-xs text-slate-400 text-right font-medium">Available: £0.00</p>
+          </div>
+        </div>
+
+        <!-- Pending Hardcoded Bills -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col h-auto">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-sm font-bold uppercase tracking-widest text-slate-500">Pending Outgoings</h2>
+            <span id="pendingBillsTotal" class="text-sm font-bold text-amber-400 bg-amber-400/10 px-3 py-1 rounded-lg">£0.00</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4 pb-4 border-b border-slate-800">Fixed bills remaining before next payday.</p>
+          <div id="pendingBillsList" class="space-y-3 flex-grow">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- MIDDLE/RIGHT COLUMN: Forecasts & Charts -->
+      <div class="space-y-6 lg:col-span-2">
+        
+        <!-- Pre-Payday Forecast Model -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          
+          <div class="flex justify-between items-end mb-6 relative z-10">
+            <div>
+              <h2 class="text-xl font-bold text-slate-100">End-of-Month Forecast</h2>
+              <p class="text-sm text-slate-400 mt-1">Projected balance just before <span class="text-slate-200 font-medium">£2,308.11</span> payday hits.</p>
+            </div>
+            <div class="text-right">
+              <span id="daysRemainingBadge" class="text-xl font-bold text-emerald-400 block">0</span>
+              <span class="text-xs text-slate-500 font-medium uppercase tracking-wider">Days Left</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+            <!-- Scenario A -->
+            <div class="bg-slate-950/50 p-5 rounded-xl border border-rose-500/20 shadow-inner">
+              <div class="flex justify-between items-start mb-2">
+                <p class="text-xs text-slate-400 uppercase tracking-wider font-bold">Scenario A: Current Pace</p>
+                <span class="flex h-2 w-2 rounded-full bg-rose-500"></span>
+              </div>
+              <p id="scenA_prePayday" class="text-3xl font-bold text-slate-100 my-1">£0.00</p>
+              <p id="scenA_odHeadroom" class="text-sm text-slate-400 font-medium">Remaining Overdraft: <span class="text-rose-400">£0.00</span></p>
+            </div>
+
+            <!-- Scenario B -->
+            <div class="bg-slate-950/50 p-5 rounded-xl border border-emerald-500/20 shadow-inner">
+              <div class="flex justify-between items-start mb-2">
+                <p class="text-xs text-slate-400 uppercase tracking-wider font-bold">Scenario B: £20/Day Cap</p>
+                <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </div>
+              <p id="scenB_prePayday" class="text-3xl font-bold text-slate-100 my-1">£0.00</p>
+              <p id="scenB_odHeadroom" class="text-sm text-slate-400 font-medium">Remaining Overdraft: <span class="text-emerald-400">£0.00</span></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics & Visualization Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Key Metrics -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-center shadow-lg">
+              <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Gross Outflow</p>
+              <p id="totalOutflow" class="text-2xl font-bold text-slate-200">£0.00</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-center shadow-lg">
+              <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Inflow</p>
+              <p id="totalInflow" class="text-2xl font-bold text-emerald-400">£0.00</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-center shadow-lg">
+              <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Daily Var. Burn</p>
+              <p id="dailyRate" class="text-2xl font-bold text-amber-400">£0.00</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-center shadow-lg">
+              <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Fast Food Spend</p>
+              <p id="fastFoodTotal" class="text-2xl font-bold text-rose-400">£0.00</p>
+            </div>
+          </div>
+
+          <!-- Top Merchants -->
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+            <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Top Merchants (Variable)</h2>
+            <div id="merchantList" class="space-y-3 text-sm">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Variable Spend Breakdown</h2>
+          <div class="relative h-64 w-full">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       APPLICATION LOGIC
+       ========================================== -->
+  <script>
+    /**
+     * CONFIGURATION
+     * Hardcoded limits, income, and exact billing dates.
+     * Note: 'day: -1' indicates the last day of the month.
+     */
+    const CONFIG = {
+      limits: { overdraft: 2000, flex: 3000 },
+      income: { name: 'Work', amount: 2308.11, day: -1 },
+      fixedBills: [
+        { id: 'mac', name: 'Amazon (Mac)', amount: 66.59, day: 12 },
+        { id: 'rent', name: 'Goodlord (Rent)', amount: 850.00, day: 15 },
+        { id: 'spotify', name: 'Google Play (Spotify)', amount: 17.99, day: 16 },
+        { id: 'phone', name: 'O2 (Phone)', amount: 15.16, day: 24 },
+        { id: 'perks', name: 'Monzo Perks', amount: 7.00, day: -1 }
+      ],
+      // Keywords to exclude from "Variable Spend" (so they don't skew the daily rate)
+      excludeFromVariable: ['goodlord', 'amazon', 'spotify', 'o2', 'monzo perks', 'flex', 'apple', 'puregym', 'dominic smith']
     };
 
-    function saveAccountInputs() {
-      localStorage.setItem('mainBal', document.getElementById('mainBalInput').value);
-      localStorage.setItem('flexBal', document.getElementById('flexBalInput').value);
-      localStorage.setItem('fixedTech', document.getElementById('fixedTechInput').value);
-      localStorage.setItem('fixedBills', document.getElementById('fixedBillsInput').value);
-      localStorage.setItem('fixedSubs', document.getElementById('fixedSubsInput').value);
+    // State Variables
+    let appState = {
+      selectedFile: null,
+      chartInstance: null
+    };
+
+    // DOM Elements Cache
+    const DOM = {
+      viewSetup: document.getElementById('view-setup'),
+      viewDashboard: document.getElementById('view-dashboard'),
+      fileInput: document.getElementById('csvFileInput'),
+      analyzeBtn: document.getElementById('analyzeBtn'),
+      backBtn: document.getElementById('backBtn'),
+      mainBalInput: document.getElementById('mainBalInput'),
+      flexBalInput: document.getElementById('flexBalInput'),
+      fileNameLabel: document.getElementById('fileNameLabel')
+    };
+
+    /**
+     * INITIALIZATION & EVENT LISTENERS
+     */
+    function init() {
+      // Load saved balances
+      DOM.mainBalInput.value = localStorage.getItem('monzo_mainBal') || '';
+      DOM.flexBalInput.value = localStorage.getItem('monzo_flexBal') || '';
+
+      // Bind Events
+      DOM.fileInput.addEventListener('change', handleFileSelect);
+      DOM.analyzeBtn.addEventListener('click', executeAnalysis);
+      DOM.backBtn.addEventListener('click', showSetupView);
+      DOM.mainBalInput.addEventListener('change', () => localStorage.setItem('monzo_mainBal', DOM.mainBalInput.value));
+      DOM.flexBalInput.addEventListener('change', () => localStorage.setItem('monzo_flexBal', DOM.flexBalInput.value));
+    }
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
       
-      updateFixedTotalBadge();
-      if (selectedFile) runAnalysis();
+      appState.selectedFile = file;
+      DOM.fileNameLabel.innerText = file.name;
+      DOM.fileNameLabel.classList.add('text-emerald-400');
+      
+      // Activate Button
+      DOM.analyzeBtn.disabled = false;
+      DOM.analyzeBtn.classList.remove('bg-slate-800', 'text-slate-500');
+      DOM.analyzeBtn.classList.add('bg-emerald-600', 'text-white', 'hover:bg-emerald-500', 'shadow-[0_0_20px_rgba(16,185,129,0.3)]');
     }
 
-    function getFixedTotal() {
-      const tech = parseFloat(document.getElementById('fixedTechInput').value) || 0;
-      const bills = parseFloat(document.getElementById('fixedBillsInput').value) || 0;
-      const subs = parseFloat(document.getElementById('fixedSubsInput').value) || 0;
-      return tech + bills + subs;
+    /**
+     * VIEW MANAGEMENT
+     */
+    function showDashboardView() {
+      // Setup transition out
+      DOM.viewSetup.classList.remove('fade-in');
+      DOM.viewSetup.classList.add('fade-out');
+      
+      setTimeout(() => {
+        DOM.viewSetup.classList.add('hidden-view');
+        DOM.viewDashboard.classList.remove('hidden-view');
+        
+        // Trigger reflow
+        void DOM.viewDashboard.offsetWidth;
+        
+        DOM.viewDashboard.classList.remove('opacity-0');
+        DOM.viewDashboard.classList.add('fade-in');
+      }, 400); // Matches CSS transition duration
     }
 
-    function updateFixedTotalBadge() {
-      const total = getFixedTotal();
-      document.getElementById('fixedTotalBadge').innerText = `Total Due: £${total.toFixed(2)}`;
+    function showSetupView() {
+      DOM.viewDashboard.classList.remove('fade-in');
+      DOM.viewDashboard.classList.add('fade-out');
+      
+      setTimeout(() => {
+        DOM.viewDashboard.classList.add('hidden-view');
+        DOM.viewDashboard.classList.remove('fade-out');
+        DOM.viewSetup.classList.remove('hidden-view');
+        
+        void DOM.viewSetup.offsetWidth;
+        
+        DOM.viewSetup.classList.remove('fade-out');
+        DOM.viewSetup.classList.add('fade-in');
+      }, 400);
     }
 
-    function fileSelected(event) {
-      selectedFile = event.target.files[0];
-      if (selectedFile) {
-        document.getElementById('fileNameLabel').innerText = `Selected: ${selectedFile.name}`;
-        const btn = document.getElementById('analyzeBtn');
-        btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-emerald-600');
-        btn.classList.add('bg-emerald-500', 'hover:bg-emerald-400', 'active:scale-95');
-      }
-    }
+    /**
+     * CORE LOGIC: Parsing & Calculation
+     */
+    function executeAnalysis() {
+      if (!appState.selectedFile) return;
 
-    function runAnalysis() {
-      if (!selectedFile) return;
-
-      Papa.parse(selectedFile, {
+      Papa.parse(appState.selectedFile, {
         header: true,
         dynamicTyping: true,
         skipEmptyLines: true,
-        complete: function(results) {
-          analyzeData(results.data);
-        }
+        complete: (results) => processData(results.data)
       });
     }
 
-    function analyzeData(rows) {
-      const validRows = rows.filter(r => r.created && r.amount !== undefined && r.amount !== null);
+    function processData(rows) {
+      // Clean and validate rows
+      const validRows = rows.filter(r => r.created && typeof r.amount === 'number');
       if (validRows.length === 0) {
-        alert("No valid Monzo transactions found.");
+        alert("No valid transaction data found.");
         return;
       }
 
-      validRows.forEach(r => {
-        r.parsedDate = new Date(r.created);
-        r.numAmount = parseFloat(r.amount);
-      });
-
+      validRows.forEach(r => r.parsedDate = new Date(r.created));
       validRows.sort((a, b) => b.parsedDate - a.parsedDate);
+
+      // Establish "Today" based on the latest transaction in the CSV
       const latestDate = validRows[0].parsedDate;
       const currentYear = latestDate.getFullYear();
       const currentMonth = latestDate.getMonth();
+      const currentDay = latestDate.getDate();
+      
+      // Calculate exact last day of the current month (28, 29, 30, or 31)
+      const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const daysRemaining = lastDayOfMonth - currentDay;
 
+      // Filter rows strictly to the current active month
       const monthRows = validRows.filter(r => 
         r.parsedDate.getFullYear() === currentYear && r.parsedDate.getMonth() === currentMonth
       );
 
-      const dayOfMonth = latestDate.getDate();
-      const lastDayOfM = new Date(currentYear, currentMonth + 1, 0).getDate();
-      const daysRemaining = lastDayOfM - dayOfMonth;
+      // Determine Pending Fixed Bills
+      const pendingBills = [];
+      let pendingBillsTotal = 0;
 
+      CONFIG.fixedBills.forEach(bill => {
+        const exactBillDay = bill.day === -1 ? lastDayOfMonth : bill.day;
+        if (exactBillDay > currentDay) {
+          pendingBills.push({ ...bill, exactDay: exactBillDay });
+          pendingBillsTotal += bill.amount;
+        }
+      });
+
+      // Calculate Metrics
       let grossOutflow = 0;
       let totalInflow = 0;
       let fastFoodTotal = 0;
       let variableOutflow = 0;
-
       const categoryTotals = {};
       const merchantTotals = {};
-      const fixedTitles = ['oh goodlord ltd', 'july overdraft fees', 'puregym', 'flex', 'dominic smith', 'adam d pursell', 'apple', 'klarna', 'clearpay'];
 
       monthRows.forEach(r => {
-        const amt = r.numAmount;
-        const title = (r.title || 'Unknown').trim();
+        const amt = r.amount;
+        const title = (r.title || 'Unknown').trim().toLowerCase();
         const category = (r.categories || 'Uncategorized').trim();
 
         if (amt > 0) {
@@ -298,106 +391,30 @@
           const absAmt = Math.abs(amt);
           grossOutflow += absAmt;
 
-          if (title.toLowerCase().includes("mcdonald") || title.toLowerCase().includes("kfc") || title.toLowerCase().includes("uber eats")) {
+          // Categorize Fast Food
+          if (title.includes("mcdonald") || title.includes("kfc") || title.includes("uber eats") || title.includes("deliveroo")) {
             fastFoodTotal += absAmt;
           }
 
-          categoryTotals[category] = (categoryTotals[category] || 0) + absAmt;
-          merchantTotals[title] = (merchantTotals[title] || 0) + absAmt;
-
-          if (!fixedTitles.some(ft => title.toLowerCase().includes(ft))) {
+          // Check if this transaction should be excluded from variable tracking
+          const isFixedOrExcluded = CONFIG.excludeFromVariable.some(keyword => title.includes(keyword));
+          
+          if (!isFixedOrExcluded) {
             variableOutflow += absAmt;
+            categoryTotals[category] = (categoryTotals[category] || 0) + absAmt;
+            merchantTotals[title] = (merchantTotals[title] || 0) + absAmt;
           }
         }
       });
 
-      const dailyRate = dayOfMonth > 0 ? (variableOutflow / dayOfMonth) : 0;
+      const dailyRate = currentDay > 0 ? (variableOutflow / currentDay) : 0;
       
-      // User Account Inputs & Limits
-      const currentMainBal = parseFloat(document.getElementById('mainBalInput').value) || 0.00;
-      const currentFlexBal = parseFloat(document.getElementById('flexBalInput').value) || 0.00;
-      const totalFixedOutgoings = getFixedTotal();
-      const odLimit = 2000.00;
-      const flexLimit = 3000.00;
+      // Balances & Limits Setup
+      const mainBal = parseFloat(DOM.mainBalInput.value) || 0;
+      const flexBal = parseFloat(DOM.flexBalInput.value) || 0;
 
-      // Update Headroom UI
-      const odUsed = currentMainBal < 0 ? Math.min(odLimit, Math.abs(currentMainBal)) : 0;
-      const odHeadroom = odLimit - odUsed;
-      const odPct = Math.min(100, (odUsed / odLimit) * 100);
+      const odUsed = mainBal < 0 ? Math.min(CONFIG.limits.overdraft, Math.abs(mainBal)) : 0;
+      const odHeadroom = CONFIG.limits.overdraft - odUsed;
+      const flexHeadroom = CONFIG.limits.flex - flexBal;
 
-      document.getElementById('odUsageText').innerText = `£${odUsed.toFixed(2)} / £2,000`;
-      document.getElementById('odProgressBar').style.width = `${odPct}%`;
-      document.getElementById('odHeadroomText').innerText = `Remaining OD Buffer: £${odHeadroom.toFixed(2)}`;
-
-      const flexPct = Math.min(100, (currentFlexBal / flexLimit) * 100);
-      const flexHeadroom = flexLimit - currentFlexBal;
-
-      document.getElementById('flexUsageText').innerText = `£${currentFlexBal.toFixed(2)} / £3,000`;
-      document.getElementById('flexProgressBar').style.width = `${flexPct}%`;
-      document.getElementById('flexHeadroomText').innerText = `Available Flex Limit: £${flexHeadroom.toFixed(2)}`;
-
-      // Forecast Calculations including Ring-fenced Fixed Outgoings
-      const scenA_totalOutflowNeeded = totalFixedOutgoings + (dailyRate * daysRemaining);
-      const scenB_totalOutflowNeeded = totalFixedOutgoings + (20.0 * daysRemaining);
-
-      const scenA_prePayday = currentMainBal - scenA_totalOutflowNeeded;
-      const scenB_prePayday = currentMainBal - scenB_totalOutflowNeeded;
-
-      const scenA_odBuffer = odLimit + scenA_prePayday;
-      const scenB_odBuffer = odLimit + scenB_prePayday;
-
-      const projectedSavings = Math.max(0, scenB_prePayday - scenA_prePayday);
-
-      // Render Outputs
-      document.getElementById('summaryFixedOutgoings').innerText = `£${totalFixedOutgoings.toFixed(2)}`;
-
-      document.getElementById('scenA_prePayday').innerText = `£${scenA_prePayday.toFixed(2)}`;
-      document.getElementById('scenA_odHeadroom').innerText = `OD Buffer: £${Math.max(0, scenA_odBuffer).toFixed(2)}`;
-
-      document.getElementById('scenB_prePayday').innerText = `£${scenB_prePayday.toFixed(2)}`;
-      document.getElementById('scenB_odHeadroom').innerText = `OD Buffer: £${Math.max(0, scenB_odBuffer).toFixed(2)}`;
-
-      document.getElementById('projectedSavings').innerText = `£${projectedSavings.toFixed(2)}`;
-
-      document.getElementById('totalOutflow').innerText = `£${grossOutflow.toFixed(2)}`;
-      document.getElementById('totalInflow').innerText = `£${totalInflow.toFixed(2)}`;
-      document.getElementById('dailyRate').innerText = `£${dailyRate.toFixed(2)}/d`;
-      document.getElementById('fastFoodTotal').innerText = `£${fastFoodTotal.toFixed(2)}`;
-      document.getElementById('daysRemainingBadge').innerText = `${daysRemaining} days left`;
-
-      const sortedMerchants = Object.entries(merchantTotals).sort((a, b) => b[1] - a[1]).slice(0, 7);
-      document.getElementById('merchantList').innerHTML = sortedMerchants.map(([name, val]) => `
-        <div class="py-2.5 flex justify-between items-center">
-          <span class="text-slate-300 font-medium">${name}</span>
-          <span class="text-rose-400 font-bold">£${val.toFixed(2)}</span>
-        </div>
-      `).join('');
-
-      renderChart(categoryTotals);
-      document.getElementById('dashboard').classList.remove('hidden');
-    }
-
-    function renderChart(categoryTotals) {
-      const ctx = document.getElementById('categoryChart').getContext('2d');
-      if (categoryChartInstance) categoryChartInstance.destroy();
-
-      categoryChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(categoryTotals),
-          datasets: [{
-            data: Object.values(categoryTotals),
-            backgroundColor: ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'],
-            borderWidth: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12, padding: 15 } } }
-        }
-      });
-    }
-  </script>
-</body>
-</html>
+      // Scenario

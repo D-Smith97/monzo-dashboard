@@ -45,7 +45,7 @@
 
       <hr class="border-slate-800">
 
-      <!-- Statement File Upload (Bulletproof Label Wrapper Fix) -->
+      <!-- Statement File Upload -->
       <div class="space-y-4">
         <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Statement Data</h2>
         
@@ -164,7 +164,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="grid grid-cols-2 gap-4">
             <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-center shadow-lg">
-              <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Gross Outflow</p>
+              <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1" title="Historical spent so far this month">Actual Outflow</p>
               <p id="totalOutflow" class="text-2xl font-bold text-slate-200">£0.00</p>
             </div>
             <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-center shadow-lg">
@@ -199,7 +199,7 @@
   </div>
 
   <!-- ==========================================
-       APPLICATION CORE SCRIPT
+       APPLICATION CORE SCRIPT (Senior Architecture)
        ========================================== -->
   <script>
     const CONFIG = {
@@ -213,6 +213,119 @@
         { id: 'perks', name: 'Monzo Perks', amount: 7.00, day: -1 }
       ],
       excludeFromVariable: ['goodlord', 'amazon', 'spotify', 'o2', 'monzo perks', 'flex', 'apple', 'puregym', 'dominic smith']
+    };
+
+    /**
+     * FinancialEngine: Pure business logic module for parsing statement rows 
+     * and calculating projections, separating actuals from commitments.
+     */
+    const FinancialEngine = {
+      process(rows, userInputs) {
+        if (!rows || rows.length === 0) throw new Error("No statement rows provided.");
+
+        const sample = rows[0];
+        const dateKey = Object.keys(sample).find(k => k.toLowerCase().includes('created') || k.toLowerCase().includes('date'));
+        const amountKey = Object.keys(sample).find(k => k.toLowerCase() === 'amount');
+        const titleKey = Object.keys(sample).find(k => k.toLowerCase() === 'name' || k.toLowerCase() === 'description' || k.toLowerCase() === 'title');
+        const categoryKey = Object.keys(sample).find(k => k.toLowerCase().includes('category') || k.toLowerCase().includes('categories'));
+
+        if (!dateKey || !amountKey) {
+          throw new Error("Could not identify standard Monzo date or amount columns in this CSV file.");
+        }
+
+        const validRows = rows
+          .filter(r => r[dateKey] && typeof r[amountKey] === 'number')
+          .map(r => ({ ...r, parsedDate: new Date(r[dateKey]) }));
+
+        if (validRows.length === 0) throw new Error("No valid transaction records found.");
+
+        validRows.sort((a, b) => b.parsedDate - a.parsedDate);
+
+        const latestDate = validRows[0].parsedDate;
+        const currentYear = latestDate.getFullYear();
+        const currentMonth = latestDate.getMonth();
+        const currentDay = latestDate.getDate();
+        
+        const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const daysRemaining = lastDayOfMonth - currentDay;
+
+        const monthRows = validRows.filter(r => 
+          r.parsedDate.getFullYear() === currentYear && r.parsedDate.getMonth() === currentMonth
+        );
+
+        let grossOutflow = 0;
+        let totalInflow = 0;
+        let fastFoodTotal = 0;
+        let variableOutflow = 0;
+        const categoryTotals = {};
+        const merchantTotals = {};
+
+        monthRows.forEach(r => {
+          const amt = r[amountKey];
+          const title = (r[titleKey] || 'Unknown').toString().trim().toLowerCase();
+          const category = (r[categoryKey] || 'Uncategorised').toString().trim();
+
+          if (amt > 0) {
+            totalInflow += amt;
+          } else if (amt < 0) {
+            const absAmt = Math.abs(amt);
+            grossOutflow += absAmt;
+
+            if (/mcdonald|kfc|uber eats|deliveroo/i.test(title)) {
+              fastFoodTotal += absAmt;
+            }
+
+            const isExcluded = CONFIG.excludeFromVariable.some(kw => title.includes(kw));
+            if (!isExcluded) {
+              variableOutflow += absAmt;
+              categoryTotals[category] = (categoryTotals[category] || 0) + absAmt;
+              merchantTotals[title] = (merchantTotals[title] || 0) + absAmt;
+            }
+          }
+        });
+
+        const dailyRate = currentDay > 0 ? (variableOutflow / currentDay) : 0;
+
+        // Calculate pending bills
+        const pendingBills = [];
+        let pendingBillsTotal = 0;
+        CONFIG.fixedBills.forEach(bill => {
+          const exactBillDay = bill.day === -1 ? lastDayOfMonth : bill.day;
+          if (exactBillDay > currentDay) {
+            pendingBills.push({ ...bill, exactDay: exactBillDay });
+            pendingBillsTotal += bill.amount;
+          }
+        });
+
+        const mainBal = userInputs.mainBal;
+        const flexBal = userInputs.flexBal;
+
+        const odUsed = mainBal < 0 ? Math.min(CONFIG.limits.overdraft, Math.abs(mainBal)) : 0;
+        const odHeadroom = CONFIG.limits.overdraft - odUsed;
+        const flexHeadroom = CONFIG.limits.flex - flexBal;
+
+        const scenA_totalOutflow = pendingBillsTotal + (dailyRate * daysRemaining);
+        const scenB_totalOutflow = pendingBillsTotal + (20.0 * daysRemaining);
+
+        const scenA_bal = mainBal - scenA_totalOutflow;
+        const scenB_bal = mainBal - scenB_totalOutflow;
+
+        return {
+          dateString: latestDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+          daysRemaining,
+          metrics: { grossOutflow, totalInflow, dailyRate, fastFoodTotal },
+          limits: {
+            odUsed, odHeadroom, odPct: (odUsed / CONFIG.limits.overdraft) * 100,
+            flexBal, flexHeadroom, flexPct: (flexBal / CONFIG.limits.flex) * 100
+          },
+          forecast: {
+            pendingBills, pendingBillsTotal,
+            scenA_bal, scenA_odRemaining: CONFIG.limits.overdraft + scenA_bal,
+            scenB_bal, scenB_odRemaining: CONFIG.limits.overdraft + scenB_bal
+          },
+          charts: { categoryTotals, merchantTotals }
+        };
+      }
     };
 
     let appState = { selectedFile: null, chartInstance: null };
@@ -238,7 +351,6 @@
       DOM.mainBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_mainBal', e.target.value));
       DOM.flexBalInput.addEventListener('input', (e) => localStorage.setItem('monzo_flexBal', e.target.value));
 
-      // Dual event bindings for bulletproof mobile touch/file picker detection
       DOM.fileInput.addEventListener('change', handleFileSelect);
       DOM.fileInput.addEventListener('input', handleFileSelect);
 
@@ -262,7 +374,6 @@
     function showDashboardView() {
       DOM.viewSetup.classList.remove('fade-in');
       DOM.viewSetup.classList.add('fade-out');
-      
       setTimeout(() => {
         DOM.viewSetup.classList.add('hidden-view');
         DOM.viewDashboard.classList.remove('hidden-view');
@@ -273,264 +384,4 @@
     }
 
     function showSetupView() {
-      DOM.viewDashboard.classList.remove('fade-in');
-      DOM.viewDashboard.classList.add('fade-out');
-      
-      setTimeout(() => {
-        DOM.viewDashboard.classList.add('hidden-view');
-        DOM.viewDashboard.classList.remove('fade-out');
-        DOM.viewSetup.classList.remove('hidden-view');
-        void DOM.viewSetup.offsetWidth;
-        DOM.viewSetup.classList.remove('fade-out');
-        DOM.viewSetup.classList.add('fade-in');
-      }, 350);
-    }
-
-    function executeAnalysis() {
-      if (!appState.selectedFile) {
-        alert("Please select a valid Monzo CSV statement file first.");
-        return;
-      }
-
-      const reader = new FileReader();
-      
-      reader.onload = function(evt) {
-        const csvContent = evt.target.result;
-        if (!csvContent || csvContent.trim().length === 0) {
-          alert("The selected file appears to be empty.");
-          return;
-        }
-
-        if (typeof Papa === 'undefined') {
-          alert("CSV Parser library failed to load. Please check your network connection.");
-          return;
-        }
-
-        Papa.parse(csvContent, {
-          header: true,
-          dynamicTyping: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            try {
-              processData(results.data);
-            } catch (err) {
-              console.error("Analysis Error:", err);
-              alert("An error occurred while processing the statement data: " + err.message);
-            }
-          },
-          error: (err) => {
-            alert("Failed to parse CSV content: " + err.message);
-          }
-        });
-      };
-
-      reader.onerror = function() {
-        alert("Unable to read file from storage. Please try re-selecting it.");
-      };
-
-      reader.readAsText(appState.selectedFile);
-    }
-
-    function processData(rows) {
-      if (!rows || rows.length === 0) {
-        alert("The selected CSV statement contains no valid data rows.");
-        return;
-      }
-
-      const sample = rows[0];
-      const dateKey = Object.keys(sample).find(k => k.toLowerCase().includes('created') || k.toLowerCase().includes('date'));
-      const amountKey = Object.keys(sample).find(k => k.toLowerCase() === 'amount');
-      const titleKey = Object.keys(sample).find(k => k.toLowerCase() === 'name' || k.toLowerCase() === 'description' || k.toLowerCase() === 'title');
-      const categoryKey = Object.keys(sample).find(k => k.toLowerCase().includes('category') || k.toLowerCase().includes('categories'));
-
-      if (!dateKey || !amountKey) {
-        alert("Could not identify standard Monzo date or amount columns in this CSV file.");
-        return;
-      }
-
-      const validRows = rows.filter(r => r[dateKey] && typeof r[amountKey] === 'number');
-      if (validRows.length === 0) {
-        alert("No valid transaction records were found in the statement.");
-        return;
-      }
-
-      validRows.forEach(r => r.parsedDate = new Date(r[dateKey]));
-      validRows.sort((a, b) => b.parsedDate - a.parsedDate);
-
-      const latestDate = validRows[0].parsedDate;
-      const currentYear = latestDate.getFullYear();
-      const currentMonth = latestDate.getMonth();
-      const currentDay = latestDate.getDate();
-      
-      const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-      const daysRemaining = lastDayOfMonth - currentDay;
-
-      const monthRows = validRows.filter(r => 
-        r.parsedDate.getFullYear() === currentYear && r.parsedDate.getMonth() === currentMonth
-      );
-
-      const pendingBills = [];
-      let pendingBillsTotal = 0;
-
-      CONFIG.fixedBills.forEach(bill => {
-        const exactBillDay = bill.day === -1 ? lastDayOfMonth : bill.day;
-        if (exactBillDay > currentDay) {
-          pendingBills.push({ ...bill, exactDay: exactBillDay });
-          pendingBillsTotal += bill.amount;
-        }
-      });
-
-      let grossOutflow = 0;
-      let totalInflow = 0;
-      let fastFoodTotal = 0;
-      let variableOutflow = 0;
-      const categoryTotals = {};
-      const merchantTotals = {};
-
-      monthRows.forEach(r => {
-        const amt = r[amountKey];
-        const title = (r[titleKey] || 'Unknown').toString().trim().toLowerCase();
-        const category = (r[categoryKey] || 'Uncategorised').toString().trim();
-
-        if (amt > 0) {
-          totalInflow += amt;
-        } else if (amt < 0) {
-          const absAmt = Math.abs(amt);
-          grossOutflow += absAmt;
-
-          if (title.includes("mcdonald") || title.includes("kfc") || title.includes("uber eats") || title.includes("deliveroo")) {
-            fastFoodTotal += absAmt;
-          }
-
-          const isExcluded = CONFIG.excludeFromVariable.some(kw => title.includes(kw));
-          if (!isExcluded) {
-            variableOutflow += absAmt;
-            categoryTotals[category] = (categoryTotals[category] || 0) + absAmt;
-            merchantTotals[title] = (merchantTotals[title] || 0) + absAmt;
-          }
-        }
-      });
-
-      const dailyRate = currentDay > 0 ? (variableOutflow / currentDay) : 0;
-      
-      const mainBal = parseFloat(DOM.mainBalInput.value) || 0;
-      const flexBal = parseFloat(DOM.flexBalInput.value) || 0;
-
-      const odUsed = mainBal < 0 ? Math.min(CONFIG.limits.overdraft, Math.abs(mainBal)) : 0;
-      const odHeadroom = CONFIG.limits.overdraft - odUsed;
-      const flexHeadroom = CONFIG.limits.flex - flexBal;
-
-      const scenA_totalOutflow = pendingBillsTotal + (dailyRate * daysRemaining);
-      const scenB_totalOutflow = pendingBillsTotal + (20.0 * daysRemaining);
-
-      const scenA_prePaydayBal = mainBal - scenA_totalOutflow;
-      const scenB_prePaydayBal = mainBal - scenB_totalOutflow;
-
-      renderDashboard({
-        dateString: latestDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
-        daysRemaining,
-        metrics: { grossOutflow, totalInflow, dailyRate, fastFoodTotal },
-        limits: {
-          odUsed, odHeadroom, odPct: (odUsed / CONFIG.limits.overdraft) * 100,
-          flexBal, flexHeadroom, flexPct: (flexBal / CONFIG.limits.flex) * 100
-        },
-        forecast: {
-          pendingBills, pendingBillsTotal,
-          scenA_bal: scenA_prePaydayBal, scenA_odRemaining: CONFIG.limits.overdraft + scenA_prePaydayBal,
-          scenB_bal: scenB_prePaydayBal, scenB_odRemaining: CONFIG.limits.overdraft + scenB_prePaydayBal
-        },
-        charts: { categoryTotals, merchantTotals }
-      });
-
-      showDashboardView();
-    }
-
-    function renderDashboard(data) {
-      document.getElementById('dashboardDateText').innerText = `Data current as of ${data.dateString}`;
-      document.getElementById('daysRemainingBadge').innerText = data.daysRemaining;
-      
-      document.getElementById('odUsageText').innerText = `£${data.limits.odUsed.toFixed(2)} / £${CONFIG.limits.overdraft.toLocaleString()}`;
-      document.getElementById('odProgressBar').style.width = `${Math.min(100, data.limits.odPct)}%`;
-      document.getElementById('odHeadroomText').innerText = `Buffer: £${Math.max(0, data.limits.odHeadroom).toFixed(2)}`;
-
-      document.getElementById('flexUsageText').innerText = `£${data.limits.flexBal.toFixed(2)} / £${CONFIG.limits.flex.toLocaleString()}`;
-      document.getElementById('flexProgressBar').style.width = `${Math.min(100, data.limits.flexPct)}%`;
-      document.getElementById('flexHeadroomText').innerText = `Available: £${Math.max(0, data.limits.flexHeadroom).toFixed(2)}`;
-
-      document.getElementById('pendingBillsTotal').innerText = `£${data.forecast.pendingBillsTotal.toFixed(2)}`;
-      const billsHtml = data.forecast.pendingBills.length > 0 
-        ? data.forecast.pendingBills.map(b => `
-            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-              <span class="text-sm text-slate-300 font-medium">${b.name} <span class="text-[10px] text-slate-500 ml-1">(Due ${b.exactDay}th)</span></span>
-              <span class="text-sm font-bold text-slate-200">£${b.amount.toFixed(2)}</span>
-            </div>`).join('')
-        : `<p class="text-sm text-emerald-500 italic p-2 bg-emerald-500/10 rounded-lg text-center">All fixed outgoings cleared for this month!</p>`;
-      document.getElementById('pendingBillsList').innerHTML = billsHtml;
-
-      document.getElementById('scenA_prePayday').innerText = `${data.forecast.scenA_bal < 0 ? '-' : ''}£${Math.abs(data.forecast.scenA_bal).toFixed(2)}`;
-      document.getElementById('scenA_odHeadroom').innerHTML = `Remaining Overdraft: <span class="${data.forecast.scenA_odRemaining < 0 ? 'text-rose-500 font-bold' : 'text-slate-300'}">£${data.forecast.scenA_odRemaining.toFixed(2)}</span>`;
-
-      document.getElementById('scenB_prePayday').innerText = `${data.forecast.scenB_bal < 0 ? '-' : ''}£${Math.abs(data.forecast.scenB_bal).toFixed(2)}`;
-      document.getElementById('scenB_odHeadroom').innerHTML = `Remaining Overdraft: <span class="${data.forecast.scenB_odRemaining < 0 ? 'text-rose-500 font-bold' : 'text-emerald-400 font-bold'}">£${data.forecast.scenB_odRemaining.toFixed(2)}</span>`;
-
-      document.getElementById('totalOutflow').innerText = `£${data.metrics.grossOutflow.toFixed(2)}`;
-      document.getElementById('totalInflow').innerText = `£${data.metrics.totalInflow.toFixed(2)}`;
-      document.getElementById('dailyRate').innerText = `£${data.metrics.dailyRate.toFixed(2)}`;
-      document.getElementById('fastFoodTotal').innerText = `£${data.metrics.fastFoodTotal.toFixed(2)}`;
-
-      const topMerchants = Object.entries(data.charts.merchantTotals)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, val]) => `
-          <div class="flex justify-between items-center border-b border-slate-800 pb-2 last:border-0 last:pb-0">
-            <span class="text-slate-300 capitalize">${name}</span>
-            <span class="text-slate-100 font-semibold">£${val.toFixed(2)}</span>
-          </div>
-        `).join('');
-      document.getElementById('merchantList').innerHTML = topMerchants || '<p class="text-xs text-slate-500">No variable data found.</p>';
-
-      drawChart(data.charts.categoryTotals);
-    }
-
-    function drawChart(categoryTotals) {
-      const canvas = document.getElementById('categoryChart');
-      if (!canvas) return;
-      
-      const ctx = canvas.getContext('2d');
-      if (appState.chartInstance) appState.chartInstance.destroy();
-
-      if (typeof Chart === 'undefined') {
-        console.warn("Chart.js missing.");
-        return;
-      }
-
-      appState.chartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(categoryTotals),
-          datasets: [{
-            data: Object.values(categoryTotals),
-            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#0ea5e9', '#f43f5e', '#64748b'],
-            borderWidth: 2,
-            borderColor: '#0f172a',
-            hoverOffset: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '75%',
-          plugins: { 
-            legend: { 
-              position: 'right', 
-              labels: { color: '#94a3b8', boxWidth: 10, padding: 12, font: { size: 11 } } 
-            } 
-          }
-        }
-      });
-    }
-
-    init();
-  </script>
-</body>
-</html>
+      DOM.viewDashboard.classList.remove('fade

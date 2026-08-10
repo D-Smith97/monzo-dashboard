@@ -15,7 +15,7 @@
     <!-- Header -->
     <header class="text-center py-2">
       <h1 class="text-2xl font-bold text-emerald-400">Financial Command Center</h1>
-      <p class="text-xs text-slate-400 mt-1">100% Local • Private • Headroom Tracking</p>
+      <p class="text-xs text-slate-400 mt-1">100% Local • Private • Full Outgoings Forecasting</p>
     </header>
 
     <!-- Account Setup & Balances Card -->
@@ -41,9 +41,41 @@
       </div>
     </div>
 
+    <!-- Upcoming Fixed Outgoings Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">2. Remaining Fixed Outgoings</h2>
+        <span id="fixedTotalBadge" class="text-xs bg-slate-700 text-amber-300 px-2.5 py-1 rounded-full font-bold">Total Due: £0.00</span>
+      </div>
+      <p class="text-xs text-slate-400">Enter bills, subscriptions, and financing payments still due before payday.</p>
+
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Tech / Mac (£)</label>
+          <input type="number" id="fixedTechInput" placeholder="50.00" step="0.01" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
+            onchange="saveAccountInputs()">
+        </div>
+
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Bills & DDs (£)</label>
+          <input type="number" id="fixedBillsInput" placeholder="250.00" step="0.01" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
+            onchange="saveAccountInputs()">
+        </div>
+
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Subs & Other (£)</label>
+          <input type="number" id="fixedSubsInput" placeholder="40.00" step="0.01" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
+            onchange="saveAccountInputs()">
+        </div>
+      </div>
+    </div>
+
     <!-- CSV Selection & Trigger -->
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl text-center space-y-4">
-      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300 text-left">2. Import Monzo Statement</h2>
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300 text-left">3. Import Monzo Statement</h2>
       <div>
         <label for="csvFileInput" class="cursor-pointer block bg-slate-900/80 border border-dashed border-slate-600 hover:border-emerald-500 p-5 rounded-xl transition-all">
           <div class="w-10 h-10 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -94,8 +126,13 @@
       <!-- Pre-Payday Forecast Card -->
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
         <div class="flex justify-between items-center">
-          <h2 class="text-base font-semibold text-slate-100">Pre-Payday Projection</h2>
+          <h2 class="text-base font-semibold text-slate-100">Pre-Payday Forecast</h2>
           <span id="daysRemainingBadge" class="text-xs bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-full">0 days left</span>
+        </div>
+
+        <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700 text-xs text-slate-300 flex justify-between items-center">
+          <span>Ring-fenced Fixed Outgoings Due:</span>
+          <span id="summaryFixedOutgoings" class="font-bold text-amber-400">£0.00</span>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -158,16 +195,38 @@
     let selectedFile = null;
     let categoryChartInstance = null;
 
-    // Load saved balances on launch
+    // Load saved balances and fixed outgoings on launch
     window.onload = function() {
       if(localStorage.getItem('mainBal')) document.getElementById('mainBalInput').value = localStorage.getItem('mainBal');
       if(localStorage.getItem('flexBal')) document.getElementById('flexBalInput').value = localStorage.getItem('flexBal');
+      if(localStorage.getItem('fixedTech')) document.getElementById('fixedTechInput').value = localStorage.getItem('fixedTech');
+      if(localStorage.getItem('fixedBills')) document.getElementById('fixedBillsInput').value = localStorage.getItem('fixedBills');
+      if(localStorage.getItem('fixedSubs')) document.getElementById('fixedSubsInput').value = localStorage.getItem('fixedSubs');
+      
+      updateFixedTotalBadge();
     };
 
     function saveAccountInputs() {
       localStorage.setItem('mainBal', document.getElementById('mainBalInput').value);
       localStorage.setItem('flexBal', document.getElementById('flexBalInput').value);
+      localStorage.setItem('fixedTech', document.getElementById('fixedTechInput').value);
+      localStorage.setItem('fixedBills', document.getElementById('fixedBillsInput').value);
+      localStorage.setItem('fixedSubs', document.getElementById('fixedSubsInput').value);
+      
+      updateFixedTotalBadge();
       if (selectedFile) runAnalysis();
+    }
+
+    function getFixedTotal() {
+      const tech = parseFloat(document.getElementById('fixedTechInput').value) || 0;
+      const bills = parseFloat(document.getElementById('fixedBillsInput').value) || 0;
+      const subs = parseFloat(document.getElementById('fixedSubsInput').value) || 0;
+      return tech + bills + subs;
+    }
+
+    function updateFixedTotalBadge() {
+      const total = getFixedTotal();
+      document.getElementById('fixedTotalBadge').innerText = `Total Due: £${total.toFixed(2)}`;
     }
 
     function fileSelected(event) {
@@ -226,7 +285,7 @@
 
       const categoryTotals = {};
       const merchantTotals = {};
-      const fixedTitles = ['oh goodlord ltd', 'july overdraft fees', 'puregym', 'flex', 'dominic smith', 'adam d pursell'];
+      const fixedTitles = ['oh goodlord ltd', 'july overdraft fees', 'puregym', 'flex', 'dominic smith', 'adam d pursell', 'apple', 'klarna', 'clearpay'];
 
       monthRows.forEach(r => {
         const amt = r.numAmount;
@@ -257,6 +316,7 @@
       // User Account Inputs & Limits
       const currentMainBal = parseFloat(document.getElementById('mainBalInput').value) || 0.00;
       const currentFlexBal = parseFloat(document.getElementById('flexBalInput').value) || 0.00;
+      const totalFixedOutgoings = getFixedTotal();
       const odLimit = 2000.00;
       const flexLimit = 3000.00;
 
@@ -276,13 +336,12 @@
       document.getElementById('flexProgressBar').style.width = `${flexPct}%`;
       document.getElementById('flexHeadroomText').innerText = `Available Flex Limit: £${flexHeadroom.toFixed(2)}`;
 
-      // Scenario Calculations relative to Live Balance
-      const upcomingFixedEstimate = 0; // Fixed bills remaining this month
-      const scenA_remainingSpend = (dailyRate * daysRemaining) + upcomingFixedEstimate;
-      const scenB_remainingSpend = (20.0 * daysRemaining) + upcomingFixedEstimate;
+      // Forecast Calculations including Ring-fenced Fixed Outgoings
+      const scenA_totalOutflowNeeded = totalFixedOutgoings + (dailyRate * daysRemaining);
+      const scenB_totalOutflowNeeded = totalFixedOutgoings + (20.0 * daysRemaining);
 
-      const scenA_prePayday = currentMainBal - scenA_remainingSpend;
-      const scenB_prePayday = currentMainBal - scenB_remainingSpend;
+      const scenA_prePayday = currentMainBal - scenA_totalOutflowNeeded;
+      const scenB_prePayday = currentMainBal - scenB_totalOutflowNeeded;
 
       const scenA_odBuffer = odLimit + scenA_prePayday;
       const scenB_odBuffer = odLimit + scenB_prePayday;
@@ -290,6 +349,8 @@
       const projectedSavings = Math.max(0, scenB_prePayday - scenA_prePayday);
 
       // Render Outputs
+      document.getElementById('summaryFixedOutgoings').innerText = `£${totalFixedOutgoings.toFixed(2)}`;
+
       document.getElementById('scenA_prePayday').innerText = `£${scenA_prePayday.toFixed(2)}`;
       document.getElementById('scenA_odHeadroom').innerText = `OD Buffer: £${Math.max(0, scenA_odBuffer).toFixed(2)}`;
 

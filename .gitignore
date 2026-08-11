@@ -1,0 +1,11 @@
+# Environment variables and secrets
+.env
+
+# Generated dashboard data and local statements
+dashboard_data.json
+*.csv
+
+# Python and virtual environment junk
+venv/
+__pycache__/
+*.pyc
